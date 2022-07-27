@@ -1,5 +1,5 @@
 use crate::build_solidity;
-use parity_scale_codec::Encode;
+use parity_scale_codec::{Decode, Encode};
 
 #[test]
 fn for_loop_no_cond_or_next() {

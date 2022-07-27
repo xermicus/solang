@@ -9,6 +9,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::convert::TryInto;
 
+#[cfg(feature = "ink_compat")]
+mod registry;
+
+#[cfg(feature = "ink_compat")]
+use self::registry::gen_project;
+
 #[derive(Deserialize, Serialize)]
 pub struct Abi {
     storage: Storage,
@@ -328,22 +334,33 @@ pub fn metadata(contract_no: usize, code: &[u8], ns: &ast::Namespace) -> Value {
 
     let contract = builder.build().unwrap();
 
-    // generate the abi for our contract
-    let abi = gen_abi(contract_no, ns);
+    let mut abi_json: Map<String, Value>;
 
-    let mut abi_json: Map<String, Value> = Map::new();
-    abi_json.insert(
-        String::from("types"),
-        serde_json::to_value(&abi.types).unwrap(),
-    );
-    abi_json.insert(
-        String::from("spec"),
-        serde_json::to_value(&abi.spec).unwrap(),
-    );
-    abi_json.insert(
-        String::from("storage"),
-        serde_json::to_value(&abi.storage).unwrap(),
-    );
+    #[cfg(feature = "ink_compat")]
+    {
+        abi_json = Map::new();
+        let project = gen_project(contract_no, ns).expect("unable to generate project");
+        abi_json.insert(String::from("V3"), serde_json::to_value(&project).unwrap());
+    }
+
+    #[cfg(not(feature = "ink_compat"))]
+    {
+        abi_json = Map::new();
+        let abi = gen_abi(contract_no, ns);
+
+        abi_json.insert(
+            String::from("types"),
+            serde_json::to_value(&abi.types).unwrap(),
+        );
+        abi_json.insert(
+            String::from("spec"),
+            serde_json::to_value(&abi.spec).unwrap(),
+        );
+        abi_json.insert(
+            String::from("storage"),
+            serde_json::to_value(&abi.storage).unwrap(),
+        );
+    }
 
     let metadata = ContractMetadata::new(source, contract, None, abi_json);
 
