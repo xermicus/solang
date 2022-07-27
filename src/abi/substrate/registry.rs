@@ -14,8 +14,9 @@ use scale_info::{
         field_state::{TypeAssigned, TypeNotAssigned},
         FieldBuilder, Fields, Variants,
     },
-    meta_type, IntoPortable, MetaType, Path, Registry, Type as ScaleType, TypeDefArray,
-    TypeDefPrimitive, TypeDefSequence, TypeInfo,
+    form::PortableForm,
+    meta_type, IntoPortable, MetaType, Path, PortableRegistry, Registry, Type as ScaleType,
+    TypeDefArray, TypeDefPrimitive, TypeDefSequence, TypeInfo,
 };
 use solang_parser::pt;
 
@@ -50,6 +51,8 @@ trait CommandOutput {
         struct Inplace {}
 
         impl TypeInfo for Inplace {
+            // FIXME: currently will generate the same TypeId,
+            //  which makes the registry only accepts the first submission
             type Identity = Self;
 
             fn type_info() -> ScaleType {
@@ -134,7 +137,6 @@ fn abi_to_type(abi_id: usize, abi: &Abi, registry: &mut Registry) -> ScaleType {
                 super::Type::BuiltinArray { def } => {
                     let abi = abi_handle.borrow();
                     let mut registry = registry_handle.borrow_mut();
-                    // get def of child element
                     let e = abi_to_type(def.array.ty, &abi, &mut registry);
                     let e_meta = command::GenMeta::wrap_and_gen(e, ());
 
@@ -314,7 +316,13 @@ fn build_segments(ty: &ScaleType, param: &ParamType) -> Vec<&'static str> {
     out
 }
 
-pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> anyhow::Result<InkProject> {
+type Artifact = (
+    PortableRegistry,
+    inklayout::Layout<PortableForm>,
+    ContractSpec<PortableForm>,
+);
+
+pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> anyhow::Result<Artifact> {
     let registry = Registry::new();
 
     let abi = Abi {
@@ -338,7 +346,6 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> anyhow::Result<In
         .filter_map(|layout| {
             let var = &ns.contracts[layout.contract_no].variables[layout.var_no];
 
-            // mappings and large types cannot be represented
             if !var.ty.contains_mapping(ns) && var.ty.fits_in_memory(ns) {
                 let mut abi = abi_handle.borrow_mut();
 
@@ -370,7 +377,6 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> anyhow::Result<In
         let r = registry_handle.borrow();
     }
 
-    // TODO: generate constructors
     let mut constructors: Vec<ConstructorSpec> = ns.contracts[contract_no]
         .functions
         .iter()
@@ -387,17 +393,14 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> anyhow::Result<In
                     .params
                     .iter()
                     .map(|p| {
-                        // still get or create the types to ABI registry
                         let e = ty_to_abi(&p.ty, ns, &mut abi);
 
-                        // generate TypeDef to be put into registry
                         let ty = abi_to_type(e.ty, &abi, &mut registry);
 
                         let segments = build_segments(&ty, &e);
 
                         let spec = command::GenTypeSpec::wrap_and_gen(ty, segments);
 
-                        // generate Inplace struct that use the TypeDef as it's TypeInfo output
                         let label = string_to_static_str(p.name_as_str().to_string());
 
                         let arg = MessageParamSpec::new(label).of_type(spec).done();
@@ -420,7 +423,6 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> anyhow::Result<In
         })
         .collect::<Vec<_>>();
 
-    // insert default constructor
     if let Some((f, _)) = &ns.contracts[contract_no].default_constructor {
         let payable = matches!(f.mutability, ast::Mutability::Payable(_));
 
@@ -432,17 +434,14 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> anyhow::Result<In
             .map(|p| {
                 let mut abi = abi_handle.borrow_mut();
                 let mut registry = registry_handle.borrow_mut();
-                // still get or create the types to ABI registry
                 let e = ty_to_abi(&p.ty, ns, &mut abi);
 
-                // generate TypeDef to be put into registry
                 let ty = abi_to_type(e.ty, &abi, &mut registry);
 
                 let segments = build_segments(&ty, &e);
 
                 let spec = command::GenTypeSpec::wrap_and_gen(ty, segments);
 
-                // generate Inplace struct that use the TypeDef as it's TypeInfo output
                 let label = string_to_static_str(p.name_as_str().to_string());
 
                 let arg = MessageParamSpec::new(label).of_type(spec).done();
@@ -461,7 +460,6 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> anyhow::Result<In
         constructors.push(inner);
     }
 
-    // TODO: generate messages
     let messages = ns.contracts[contract_no]
         .all_functions
         .keys()
@@ -492,10 +490,8 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> anyhow::Result<In
                 .params
                 .iter()
                 .map(|p| {
-                    // still get or create the types to ABI registry
                     let e = ty_to_abi(&p.ty, ns, &mut abi);
 
-                    // generate TypeDef to be put into registry
                     let ty = abi_to_type(e.ty, &abi, &mut registry);
 
                     let label = string_to_static_str(p.name_as_str().to_string());
@@ -529,12 +525,10 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> anyhow::Result<In
                 1 => {
                     let e = ty_to_abi(&f.returns[0].ty, ns, &mut abi);
 
-                    // generate TypeDef to be put into registry
                     let ty = abi_to_type(e.ty, &abi, &mut registry);
 
                     let spec = command::GenTypeSpec::wrap_and_gen(ty, segments);
 
-                    // TODO: create Inplace struct
                     ReturnTypeSpec::new(spec)
                 }
                 _ => {
@@ -557,14 +551,12 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> anyhow::Result<In
 
                                 let e = ty_to_abi(&field.ty, ns, &mut abi);
 
-                                // generate TypeDef to be put into registry
                                 let ty = abi_to_type(e.ty, &abi, &mut registry);
 
                                 command::DecFieldBuilder::wrap_and_gen(ty, b.name(name))
                             });
                         }
 
-                        // TODO: register type in registry;
                         let ret_type = scale_info::Type::builder()
                             .docs(&[])
                             .path(path)
@@ -580,7 +572,6 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> anyhow::Result<In
                                 let mut registry = registry_handle.borrow_mut();
                                 let e = ty_to_abi(&field.ty, ns, &mut abi);
 
-                                // generate TypeDef to be put into registry
                                 let ty = abi_to_type(e.ty, &mut abi, &mut registry);
 
                                 command::DecFieldBuilder::wrap_and_gen(ty, b)
@@ -642,7 +633,6 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> anyhow::Result<In
                     let mut registry = registry_handle.borrow_mut();
                     let e = ty_to_abi(&p.ty, ns, &mut abi);
 
-                    // generate TypeDef to be put into registry
                     let ty = abi_to_type(e.ty, &abi, &mut registry);
 
                     let segments = e
@@ -676,7 +666,10 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> anyhow::Result<In
         .events(events)
         .done();
 
-    let project = InkProject::new(layout, spec);
+    let mut r = registry_handle.into_inner();
+    let layout = layout.into_portable(&mut r);
+    let spec = spec.into_portable(&mut r);
+    let registry = PortableRegistry::from(r);
 
-    Ok(project)
+    Ok((registry, layout, spec))
 }

@@ -339,8 +339,16 @@ pub fn metadata(contract_no: usize, code: &[u8], ns: &ast::Namespace) -> Value {
     #[cfg(feature = "ink_compat")]
     {
         abi_json = Map::new();
-        let project = gen_project(contract_no, ns).expect("unable to generate project");
-        abi_json.insert(String::from("V3"), serde_json::to_value(&project).unwrap());
+        let (registry, storage, spec) =
+            gen_project(contract_no, ns).expect("unable to generate project");
+
+        let artifact = serde_json::json!({
+            "registry": registry,
+            "storage": storage,
+            "spec": spec
+        });
+
+        abi_json.insert(String::from("V3"), serde_json::to_value(&artifact).unwrap());
     }
 
     #[cfg(not(feature = "ink_compat"))]
