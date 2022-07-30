@@ -8,6 +8,8 @@ use ink_metadata::{
     MessageSpec, ReturnTypeSpec, TypeSpec,
 };
 
+pub mod converter;
+
 use once_cell::sync::{Lazy, OnceCell};
 use scale_info::{
     build::{
@@ -19,8 +21,12 @@ use scale_info::{
     TypeDefArray, TypeDefPrimitive, TypeDefSequence, TypeInfo,
 };
 use solang_parser::pt;
+use sp_core::U256;
 
-use super::{ty_to_abi, Abi, ParamType, PrimitiveDef, Spec, Storage, StorageStruct};
+use super::{
+    gen_abi, ty_to_abi, Abi, ArrayDef, EnumDef, LayoutField, LayoutFieldCell, ParamType,
+    PrimitiveDef, SequenceDef, Spec, Storage, StorageLayout, StorageStruct,
+};
 
 pub fn string_to_static_str(s: String) -> &'static str {
     Box::leak(s.into_boxed_str())
@@ -137,38 +143,12 @@ fn abi_to_type(abi_id: usize, abi: &Abi, registry: &mut Registry) -> ScaleType {
                 super::Type::BuiltinArray { def } => {
                     let abi = abi_handle.borrow();
                     let mut registry = registry_handle.borrow_mut();
-                    let e = abi_to_type(def.array.ty, &abi, &mut registry);
-                    let e_meta = command::GenMeta::wrap_and_gen(e, ());
-
-                    let ty = ScaleType::from(TypeDefArray::new(def.array.len as u32, e_meta));
-
-                    let meta = command::GenMeta::wrap_and_gen(ty.clone(), ());
-                    registry.register_type(&meta);
-
-                    {
-                        let mut handle = TYPEMAP.lock().expect("unable to lock");
-                        handle.insert(abi_id, ty.clone());
-                    }
-
-                    ty
+                    array_to_type(abi_id, def, &abi, &mut registry)
                 }
                 super::Type::BuiltinSequence { def } => {
                     let abi = abi_handle.borrow();
                     let mut registry = registry_handle.borrow_mut();
-                    let e = abi_to_type(def.sequence.ty, &abi, &mut registry);
-
-                    let e_meta = command::GenMeta::wrap_and_gen(e, ());
-                    let ty = ScaleType::from(TypeDefSequence::new(e_meta));
-
-                    let meta = command::GenMeta::wrap_and_gen(ty.clone(), ());
-                    registry.register_type(&meta);
-
-                    {
-                        let mut handle = TYPEMAP.lock().expect("unable to lock");
-                        handle.insert(abi_id, ty.clone());
-                    }
-
-                    ty
+                    sequence_to_type(abi_id, def, &abi, &mut registry)
                 }
                 super::Type::Struct { path, def } => {
                     let segments = path
@@ -227,31 +207,8 @@ fn abi_to_type(abi_id: usize, abi: &Abi, registry: &mut Registry) -> ScaleType {
                     composite
                 }
                 super::Type::Enum { path, def } => {
-                    let p = path
-                        .iter()
-                        .map(|e| string_to_static_str(e.clone()))
-                        .collect::<Vec<_>>();
-                    let path = Path::from_segments(p).expect("unable to construct path");
-                    let mut variants = Variants::new();
-                    for v in &def.variant.variants {
-                        variants = variants.variant_unit(
-                            string_to_static_str(v.name.clone()),
-                            v.discriminant as u8,
-                        )
-                    }
-
-                    let ty = ScaleType::builder().path(path).variant(variants);
-
-                    let meta = command::GenMeta::wrap_and_gen(ty.clone(), ());
                     let mut registry = registry_handle.borrow_mut();
-                    registry.register_type(&meta);
-
-                    {
-                        let mut handle = TYPEMAP.lock().expect("unable to lock");
-                        handle.insert(abi_id, ty.clone());
-                    }
-
-                    ty
+                    enum_to_type(abi_id, path, def, &mut registry)
                 }
             }
         }
@@ -260,7 +217,100 @@ fn abi_to_type(abi_id: usize, abi: &Abi, registry: &mut Registry) -> ScaleType {
     ty
 }
 
+fn enum_to_type(
+    abi_id: usize,
+    path: &Vec<String>,
+    def: &EnumDef,
+    registry: &mut Registry,
+) -> ScaleType {
+    let p = path
+        .iter()
+        .map(|e| string_to_static_str(e.clone()))
+        .collect::<Vec<_>>();
+    let path = Path::from_segments(p).expect("unable to construct path");
+    let mut variants = Variants::new();
+    for v in &def.variant.variants {
+        variants = variants.variant_unit(string_to_static_str(v.name.clone()), v.discriminant as u8)
+    }
+
+    let ty = ScaleType::builder().path(path).variant(variants);
+
+    let meta = command::GenMeta::wrap_and_gen(ty.clone(), ());
+    registry.register_type(&meta);
+
+    {
+        let mut handle = TYPEMAP.lock().expect("unable to lock");
+        handle.insert(abi_id, ty.clone());
+        _ = registry;
+    }
+
+    ty
+}
+
+fn array_to_type(abi_id: usize, def: &ArrayDef, abi: &Abi, registry: &mut Registry) -> ScaleType {
+    let e = abi_to_type(def.array.ty, &abi, registry);
+    let e_meta = command::GenMeta::wrap_and_gen(e, ());
+
+    let ty = ScaleType::from(TypeDefArray::new(def.array.len as u32, e_meta));
+
+    let meta = command::GenMeta::wrap_and_gen(ty.clone(), ());
+    registry.register_type(&meta);
+
+    {
+        let mut handle = TYPEMAP.lock().expect("unable to lock");
+        handle.insert(abi_id, ty.clone());
+        _ = registry;
+    }
+
+    ty
+}
+
+fn sequence_to_type(
+    abi_id: usize,
+    def: &SequenceDef,
+    abi: &Abi,
+    registry: &mut Registry,
+) -> ScaleType {
+    let e = abi_to_type(def.sequence.ty, &abi, registry);
+    let e_meta = command::GenMeta::wrap_and_gen(e, ());
+
+    let ty = ScaleType::from(TypeDefSequence::new(e_meta));
+
+    let meta = command::GenMeta::wrap_and_gen(ty.clone(), ());
+    registry.register_type(&meta);
+
+    {
+        let mut handle = TYPEMAP.lock().expect("unable to lock");
+        handle.insert(abi_id, ty.clone());
+        _ = registry;
+    }
+
+    ty
+}
+
 fn primitive_to_type(abi_id: usize, def: &PrimitiveDef, registry: &mut Registry) -> ScaleType {
+    let meta = match def.primitive.as_str() {
+        "bool" => meta_type::<bool>(),
+        "str" => meta_type::<str>(),
+        "u8" => meta_type::<u8>(),
+        "u16" => meta_type::<u16>(),
+        "u32" => meta_type::<u32>(),
+        "u64" => meta_type::<u64>(),
+        "u128" => meta_type::<u128>(),
+        "u256" => meta_type::<U256>(),
+        "i8" => meta_type::<i8>(),
+        "i16" => meta_type::<i16>(),
+        "i32" => meta_type::<i32>(),
+        "i64" => meta_type::<i64>(),
+        "i128" => meta_type::<bool>(),
+        "AccountId" => meta_type::<[u8; 32]>(),
+        _ => {
+            unimplemented!("not supported types")
+        }
+    };
+
+    registry.register_type(&meta);
+
     let ty = match def.primitive.as_str() {
         "bool" => ScaleType::from(TypeDefPrimitive::Bool),
         "str" => ScaleType::from(TypeDefPrimitive::Str),
@@ -289,11 +339,8 @@ fn primitive_to_type(abi_id: usize, def: &PrimitiveDef, registry: &mut Registry)
     {
         let mut handle = TYPEMAP.lock().expect("unable to lock");
         handle.insert(abi_id, ty.clone());
+        _ = registry;
     }
-
-    let meta = command::GenMeta::wrap_and_gen(ty.clone(), ());
-
-    registry.register_type(&meta);
 
     ty
 }
@@ -348,15 +395,16 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> anyhow::Result<Ar
 
             if !var.ty.contains_mapping(ns) && var.ty.fits_in_memory(ns) {
                 let mut abi = abi_handle.borrow_mut();
-
                 let mut registry = registry_handle.borrow_mut();
-                let inner: FieldLayout;
 
-                let key = <[u8; 32]>::from_hex(format!("{:064X}", layout.slot))
-                    .expect("failed to parse hex string");
+                let inner: FieldLayout;
+                let param = ty_to_abi(&layout.ty, ns, &mut abi);
+
+                let abi_key = format!("0x{:064X}", layout.slot);
+
+                let key = <[u8; 32]>::from_hex(&abi_key[2..]).expect("failed to parse hex string");
 
                 let layout_key = LayoutKey::from(key);
-                let param = ty_to_abi(&layout.ty, ns, &mut abi);
                 let ty = abi_to_type(param.ty, &abi, &mut registry);
 
                 let flayout = command::GenCellLayout::wrap_and_gen(ty.clone(), layout_key);
@@ -372,10 +420,6 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> anyhow::Result<Ar
 
     let slayout = StructLayout::new(fields);
     let layout = inklayout::Layout::Struct(slayout);
-
-    {
-        let r = registry_handle.borrow();
-    }
 
     let mut constructors: Vec<ConstructorSpec> = ns.contracts[contract_no]
         .functions
@@ -491,7 +535,6 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> anyhow::Result<Ar
                 .iter()
                 .map(|p| {
                     let e = ty_to_abi(&p.ty, ns, &mut abi);
-
                     let ty = abi_to_type(e.ty, &abi, &mut registry);
 
                     let label = string_to_static_str(p.name_as_str().to_string());
@@ -520,11 +563,15 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> anyhow::Result<Ar
                 .map(|v| string_to_static_str(v.clone()))
                 .collect::<Vec<_>>();
 
+            drop(abi);
+            drop(registry);
+
             let return_spec = match f.returns.len() {
                 0 => ReturnTypeSpec::new(None),
                 1 => {
+                    let mut abi = abi_handle.borrow_mut();
+                    let mut registry = registry_handle.borrow_mut();
                     let e = ty_to_abi(&f.returns[0].ty, ns, &mut abi);
-
                     let ty = abi_to_type(e.ty, &abi, &mut registry);
 
                     let spec = command::GenTypeSpec::wrap_and_gen(ty, segments);
@@ -583,8 +630,15 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> anyhow::Result<Ar
                             .path(path)
                             .composite(fields_builder);
 
+                        let mut registry = registry_handle.borrow_mut();
+
                         let meta = command::GenMeta::wrap_and_gen(ret_type.clone(), ());
                         registry.register_type(&meta);
+
+                        {
+                            _ = registry;
+                            _ = abi;
+                        }
 
                         ret_type
                     };
@@ -666,10 +720,51 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> anyhow::Result<Ar
         .events(events)
         .done();
 
-    let mut r = registry_handle.into_inner();
-    let layout = layout.into_portable(&mut r);
-    let spec = spec.into_portable(&mut r);
-    let registry = PortableRegistry::from(r);
+    // let mut r = registry_handle.into_inner();
+    // let layout = layout.into_portable(&mut r);
+
+    let mut a = gen_abi(contract_no, ns);
+
+    // make sure u8 is in types
+    // let mut a = abi_handle.borrow_mut();
+    let has_acc = a
+        .types
+        .iter()
+        .find(|e| {
+            if let super::Type::Builtin { def } = e {
+                def.primitive == "AccountId"
+            } else {
+                false
+            }
+        })
+        .is_some();
+
+    let has_u8 = a
+        .types
+        .iter()
+        .find(|e| {
+            if let super::Type::Builtin { def } = e {
+                def.primitive == "u8"
+            } else {
+                false
+            }
+        })
+        .is_some();
+
+    match (has_acc, has_u8) {
+        (true, false) => {
+            let _ = a.builtin_type("u8");
+        }
+        _ => {}
+    }
+
+    let project = InkProject::new(layout, spec);
+
+    let layout = converter::abi_to_layout(&a);
+    let registry = converter::abi_to_types(&a);
+    let spec = converter::abi_to_spec(&a, &project);
+
+    // let spec = spec.into_portable(&mut r);
 
     Ok((registry, layout, spec))
 }

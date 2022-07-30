@@ -3,6 +3,7 @@ use crate::parser::pt;
 use crate::sema::ast;
 use crate::sema::tags::render;
 use contract_metadata::*;
+use ink_metadata::{InkProject, MetadataVersioned};
 use num_traits::ToPrimitive;
 use semver::Version;
 use serde::{Deserialize, Serialize};
@@ -338,17 +339,19 @@ pub fn metadata(contract_no: usize, code: &[u8], ns: &ast::Namespace) -> Value {
 
     #[cfg(feature = "ink_compat")]
     {
-        abi_json = Map::new();
         let (registry, storage, spec) =
             gen_project(contract_no, ns).expect("unable to generate project");
 
-        let artifact = serde_json::json!({
-            "registry": registry,
+        let value = serde_json::json!({
+            "types": registry.types(),
             "storage": storage,
             "spec": spec
         });
 
-        abi_json.insert(String::from("V3"), serde_json::to_value(&artifact).unwrap());
+        let project = serde_json::from_value::<InkProject>(value).unwrap();
+        let versioned = MetadataVersioned::from(project);
+
+        abi_json = serde_json::from_value(serde_json::to_value(versioned).unwrap()).unwrap();
     }
 
     #[cfg(not(feature = "ink_compat"))]
@@ -370,7 +373,7 @@ pub fn metadata(contract_no: usize, code: &[u8], ns: &ast::Namespace) -> Value {
         );
     }
 
-    let metadata = ContractMetadata::new(source, contract, None, abi_json);
+    let mut metadata = ContractMetadata::new(source, contract, None, abi_json);
 
     // serialize to json
     serde_json::to_value(&metadata).unwrap()
