@@ -504,7 +504,7 @@ impl SerdeConversion for ParamIndexed {
     fn serde_cast(&self) -> Self::Output {
         let spec_json = json!({
             "type": self.param.ty.ty,
-            "displayName": self.param.name
+            "displayName": vec![&self.param.name]
         });
 
         let spec = serde_json::from_value::<TypeSpec<PortableForm>>(spec_json).unwrap();
