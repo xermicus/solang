@@ -3,7 +3,10 @@ use crate::parser::pt;
 use crate::sema::ast;
 use crate::sema::tags::render;
 use contract_metadata::*;
+
+#[cfg(feature = "ink_compat")]
 use ink_metadata::{InkProject, MetadataVersioned};
+
 use num_traits::ToPrimitive;
 use semver::Version;
 use serde::{Deserialize, Serialize};
@@ -113,6 +116,7 @@ pub struct Constructor {
     pub selector: String,
     pub docs: Vec<String>,
     args: Vec<Param>,
+    payable: bool,
 }
 
 impl Constructor {
@@ -423,6 +427,8 @@ fn gen_abi(contract_no: usize, ns: &ast::Namespace) -> Abi {
         .filter_map(|function_no| {
             let f = &ns.functions[*function_no];
             if f.is_constructor() {
+                let payable = matches!(f.mutability, ast::Mutability::Payable(_));
+
                 Some(Constructor {
                     name: String::from("new"),
                     selector: render_selector(f),
@@ -432,6 +438,7 @@ fn gen_abi(contract_no: usize, ns: &ast::Namespace) -> Abi {
                         .map(|p| parameter_to_abi(p, ns, &mut abi))
                         .collect(),
                     docs: vec![render(&f.tags)],
+                    payable,
                 })
             } else {
                 None
@@ -440,6 +447,8 @@ fn gen_abi(contract_no: usize, ns: &ast::Namespace) -> Abi {
         .collect::<Vec<Constructor>>();
 
     if let Some((f, _)) = &ns.contracts[contract_no].default_constructor {
+        let payable = matches!(f.mutability, ast::Mutability::Payable(_));
+
         constructors.push(Constructor {
             name: String::from("new"),
             selector: render_selector(f),
@@ -449,6 +458,7 @@ fn gen_abi(contract_no: usize, ns: &ast::Namespace) -> Abi {
                 .map(|p| parameter_to_abi(p, ns, &mut abi))
                 .collect(),
             docs: vec![render(&f.tags)],
+            payable,
         });
     }
 
