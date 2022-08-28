@@ -32,18 +32,18 @@ use crate::sema::{
 fn primitive_to_ty(ty: &ast::Type, registry: &mut PortableRegistry) -> Type<PortableForm> {
     match ty {
         ast::Type::Int(_) | ast::Type::Uint(_) => int_to_ty(ty, registry),
-        ast::Type::Bool => Type::<PortableForm> {
-            path: Default::default(),
-            type_params: Default::default(),
-            type_def: TypeDef::Primitive(TypeDefPrimitive::Bool),
-            docs: Default::default(),
-        },
-        ast::Type::String => Type::<PortableForm> {
-            path: Default::default(),
-            type_params: Default::default(),
-            type_def: TypeDef::Primitive(TypeDefPrimitive::Str),
-            docs: Default::default(),
-        },
+        ast::Type::Bool => Type::new(
+            Default::default(),
+            vec![],
+            TypeDef::Primitive(TypeDefPrimitive::Bool),
+            Default::default(),
+        ),
+        ast::Type::String => Type::new(
+            Default::default(),
+            vec![],
+            TypeDef::Primitive(TypeDefPrimitive::Str),
+            Default::default(),
+        ),
         _ => unreachable!("non primitive types"),
     }
 }
@@ -73,12 +73,12 @@ fn int_to_ty(ty: &ast::Type, registry: &mut PortableRegistry) -> Type<PortableFo
         _ => unreachable!(),
     };
 
-    let ty = Type::<PortableForm> {
-        path: Default::default(),
-        type_params: Default::default(),
-        type_def: TypeDef::Primitive(def),
-        docs: Default::default(),
-    };
+    let ty = Type::new(
+        Default::default(),
+        vec![],
+        TypeDef::Primitive(def),
+        Default::default(),
+    );
 
     get_or_register_ty(&ty, registry);
 
@@ -147,12 +147,12 @@ fn resolve_ast(
 
                     // resolve current depth
                     ty = get_or_register_ty(
-                        &Type::<PortableForm> {
-                            path: Default::default(),
-                            type_params: Default::default(),
-                            type_def: TypeDef::Array(def),
-                            docs: Default::default(),
-                        },
+                        &Type::new(
+                            Default::default(),
+                            vec![],
+                            TypeDef::Array(def),
+                            Default::default(),
+                        ),
                         registry,
                     );
                 } else {
@@ -160,12 +160,12 @@ fn resolve_ast(
 
                     // resolve current depth
                     ty = get_or_register_ty(
-                        &Type::<PortableForm> {
-                            path: Default::default(),
-                            type_params: Default::default(),
-                            type_def: TypeDef::Sequence(def),
-                            docs: Default::default(),
-                        },
+                        &Type::new(
+                            Default::default(),
+                            vec![],
+                            TypeDef::Sequence(def),
+                            Default::default(),
+                        ),
                         registry,
                     );
                 }
@@ -211,12 +211,12 @@ fn resolve_ast(
 
             let c = TypeDefComposite::<PortableForm> { fields };
 
-            let ty = Type::<PortableForm> {
-                path: Default::default(),
-                type_params: Default::default(),
-                type_def: TypeDef::Composite(c),
-                docs: Default::default(),
-            };
+            let ty = Type::new(
+                Default::default(),
+                vec![],
+                TypeDef::Composite(c),
+                Default::default(),
+            );
 
             get_or_register_ty(&ty, registry)
         }
@@ -240,12 +240,12 @@ fn resolve_ast(
 
             let v = TypeDefVariant::new(variants);
 
-            let ty = Type::<PortableForm> {
-                path: Default::default(),
-                type_params: Default::default(),
-                type_def: TypeDef::Variant(v),
-                docs: Default::default(),
-            };
+            let ty = Type::new(
+                Default::default(),
+                vec![],
+                TypeDef::Variant(v),
+                Default::default(),
+            );
 
             get_or_register_ty(&ty, registry)
         }
@@ -269,12 +269,12 @@ fn resolve_ast(
 
             let c = TypeDefComposite { fields };
 
-            let ty = Type::<PortableForm> {
-                path: Default::default(),
-                type_params: Default::default(),
-                type_def: TypeDef::Composite(c),
-                docs: Default::default(),
-            };
+            let ty = Type::new(
+                Default::default(),
+                vec![],
+                TypeDef::Composite(c),
+                Default::default(),
+            );
 
             get_or_register_ty(&ty, registry)
         }
@@ -290,7 +290,7 @@ fn get_or_register_ty(ty: &Type<PortableForm>, registry: &mut PortableRegistry) 
         t.clone()
     } else {
         let id = registry.types().len() as u32;
-        let pty = PortableType { id, ty: ty.clone() };
+        let pty = PortableType::new_custom(id, ty.clone());
         let mut types: Vec<PortableType> = Vec::from(registry.types());
         types.push(pty.clone());
         *registry = PortableRegistry::new_from_types(types);
@@ -302,7 +302,7 @@ fn get_or_register_ty(ty: &Type<PortableForm>, registry: &mut PortableRegistry) 
 /// generate `InkProject` from `ast::Type` and `ast::Namespace`
 pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> InkProject {
     // manually building the PortableRegistry
-    let mut registry = PortableRegistry { types: vec![] };
+    let mut registry = PortableRegistry::new_from_types(vec![]);
 
     // type cache to avoid resolving already resolved `ast::Type`
     let mut cache = Cache::new();
@@ -413,23 +413,23 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> InkProject {
                         // TODO: `ink_metadata` mandates all field to be named or all unnamed, should we follow this for return type in case of partially named field?
                         let name = r_p.id.clone().map(|i| i.name);
 
-                        Field::<PortableForm> {
+                        Field::new(
                             name,
-                            ty: *f_spec.ty(),
-                            type_name: Some(f_spec.display_name().to_string()),
-                            docs: Default::default(),
-                        }
+                            *f_spec.ty(),
+                            Some(f_spec.display_name().to_string()),
+                            Default::default(),
+                        )
                     })
                     .collect::<Vec<_>>();
 
                 let c = TypeDefComposite { fields };
 
-                let ty = Type::<PortableForm> {
-                    path: Default::default(),
-                    type_params: Default::default(),
-                    type_def: TypeDef::Composite(c),
-                    docs: Default::default(),
-                };
+                let ty = Type::new(
+                    Default::default(),
+                    vec![],
+                    TypeDef::Composite(c),
+                    Default::default(),
+                );
 
                 let ty = get_or_register_ty(&ty, &mut registry);
 
