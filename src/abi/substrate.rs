@@ -116,23 +116,16 @@ fn resolve_ast(
             );
 
             // substituded to struct { AccountId }
-            let field = Field::<PortableForm> {
-                name: None,
-                type_name: None,
-                ty: address_ty.id.into(),
-                docs: vec![],
-            };
+            let field = Field::new(None, address_ty.id().into(), None, vec![]);
 
-            let c = TypeDefComposite::<PortableForm> {
-                fields: vec![field],
-            };
+            let c = TypeDefComposite::new(vec![field]);
 
-            let ty = Type::<PortableForm> {
-                path: Default::default(),
-                type_params: Default::default(),
-                type_def: TypeDef::Composite(c),
-                docs: Default::default(),
-            };
+            let ty: Type<PortableForm> = Type::new(
+                Default::default(),
+                vec![],
+                TypeDef::Composite(c),
+                Default::default(),
+            );
 
             get_or_register_ty(&ty, registry)
         }
@@ -150,10 +143,7 @@ fn resolve_ast(
 
             for d in dims {
                 if let ast::ArrayLength::Fixed(d) = d {
-                    let def = TypeDefArray::<PortableForm> {
-                        len: d.to_u32().unwrap(),
-                        type_param: ty.id.into(),
-                    };
+                    let def = TypeDefArray::new(d.to_u32().unwrap(), ty.id().into());
 
                     // resolve current depth
                     ty = get_or_register_ty(
@@ -166,9 +156,7 @@ fn resolve_ast(
                         registry,
                     );
                 } else {
-                    let def = TypeDefSequence::<PortableForm> {
-                        type_param: ty.id.into(),
-                    };
+                    let def = TypeDefSequence::new(ty.id().into());
 
                     // resolve current depth
                     ty = get_or_register_ty(
@@ -212,12 +200,12 @@ fn resolve_ast(
                 .map(|f| {
                     let f_ty = resolve_ast(&f.ty, ns, registry, cache);
 
-                    Field::<PortableForm> {
-                        name: Some(f.name_as_str().to_string()),
-                        type_name: None,
-                        ty: f_ty.id.into(),
-                        docs: vec![],
-                    }
+                    Field::new(
+                        Some(f.name_as_str().to_string()),
+                        f_ty.id().into(),
+                        None,
+                        vec![],
+                    )
                 })
                 .collect::<Vec<Field<PortableForm>>>();
 
@@ -270,12 +258,12 @@ fn resolve_ast(
                 .map(|ty| {
                     let ty = resolve_ast(&ty, ns, registry, cache);
 
-                    Field::<PortableForm> {
-                        name: Default::default(),
-                        ty: ty.id.into(),
-                        type_name: Default::default(),
-                        docs: Default::default(),
-                    }
+                    Field::new(
+                        Default::default(),
+                        ty.id().into(),
+                        Default::default(),
+                        Default::default(),
+                    )
                 })
                 .collect::<Vec<_>>();
 
@@ -298,12 +286,14 @@ fn resolve_ast(
 
 /// register new type if not already specified, type_id starts from 0
 fn get_or_register_ty(ty: &Type<PortableForm>, registry: &mut PortableRegistry) -> PortableType {
-    if let Some(t) = registry.types().iter().find(|e| e.ty == *ty) {
+    if let Some(t) = registry.types().iter().find(|e| e.ty() == ty) {
         t.clone()
     } else {
         let id = registry.types().len() as u32;
         let pty = PortableType { id, ty: ty.clone() };
-        registry.types.push(pty.clone());
+        let mut types: Vec<PortableType> = Vec::from(registry.types());
+        types.push(pty.clone());
+        *registry = PortableRegistry::new_from_types(types);
 
         pty
     }
@@ -334,7 +324,7 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> InkProject {
 
                 let ty = resolve_ast(&layout.ty, ns, &mut registry, &mut cache);
 
-                let cell = CellLayout::new_from_ty(layout_key, ty.id.into());
+                let cell = CellLayout::new_from_ty(layout_key, ty.id().into());
 
                 let f = FieldLayout::new_custom(var.name.clone(), Layout::Cell(cell));
 
@@ -356,7 +346,7 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> InkProject {
             .map(|p| {
                 let ty = resolve_ast(&p.ty, ns, &mut registry, &mut cache);
 
-                let spec = TypeSpec::new_from_ty(ty.id.into(), Default::default());
+                let spec = TypeSpec::new_from_ty(ty.id().into(), Default::default());
 
                 MessageParamSpec::new_custom(p.name_as_str().to_string(), spec)
             })
@@ -406,7 +396,7 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> InkProject {
             1 => {
                 let ty = resolve_ast(&f.returns[0].ty, ns, &mut registry, &mut cache);
 
-                let spec = TypeSpec::new_from_ty(ty.id.into(), Default::default());
+                let spec = TypeSpec::new_from_ty(ty.id().into(), Default::default());
 
                 Some(spec)
             }
@@ -418,7 +408,7 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> InkProject {
                     .map(|r_p| {
                         let ty = resolve_ast(&r_p.ty, ns, &mut registry, &mut cache);
 
-                        let f_spec = TypeSpec::new_from_ty(ty.id.into(), Default::default());
+                        let f_spec = TypeSpec::new_from_ty(ty.id().into(), Default::default());
 
                         // TODO: `ink_metadata` mandates all field to be named or all unnamed, should we follow this for return type in case of partially named field?
                         let name = r_p.id.clone().map(|i| i.name);
@@ -443,7 +433,7 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> InkProject {
 
                 let ty = get_or_register_ty(&ty, &mut registry);
 
-                Some(TypeSpec::new_from_ty(ty.id.into(), Path::default()))
+                Some(TypeSpec::new_from_ty(ty.id().into(), Path::default()))
             }
         };
 
@@ -455,7 +445,7 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> InkProject {
             .map(|p| {
                 let ty = resolve_ast(&p.ty, ns, &mut registry, &mut cache);
 
-                let spec = TypeSpec::new_from_ty(ty.id.into(), Default::default());
+                let spec = TypeSpec::new_from_ty(ty.id().into(), Default::default());
 
                 MessageParamSpec::new_custom(p.name_as_str().to_string(), spec)
             })
@@ -504,7 +494,7 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> InkProject {
 
                 let ty = resolve_ast(&p.ty, ns, &mut registry, &mut cache);
 
-                let spec = TypeSpec::new_from_ty(ty.id.into(), Default::default());
+                let spec = TypeSpec::new_from_ty(ty.id().into(), Default::default());
 
                 EventParamSpec::new_custom(label, spec)
                     .indexed(p.indexed)
