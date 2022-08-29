@@ -8,7 +8,7 @@ use self::{
 use crate::file_resolver::{FileResolver, ResolvedFile};
 use crate::sema::unused_variable::{check_unused_events, check_unused_namespace_variables};
 use num_bigint::BigInt;
-use solang_parser::{doccomment::parse_doccomments, parse, pt};
+use solang_parser::{diagnostics::Diagnostic, doccomment::parse_doccomments, parse, pt};
 use std::ffi::OsStr;
 
 mod address;
@@ -50,6 +50,19 @@ pub fn sema(file: &ResolvedFile, resolver: &mut FileResolver, ns: &mut ast::Name
         // Checks for unused variables
         check_unused_namespace_variables(ns);
         check_unused_events(ns);
+
+        // Substrate: Every contract must have at least one public message
+        if ns.target.is_substrate() {
+            for c in ns.contracts.iter() {
+                if c.has_public_functions(ns) || !c.is_concrete() {
+                    continue;
+                }
+                ns.diagnostics.push(Diagnostic::error(
+                    c.loc,
+                    format!("Contract '{}' has no public message", &c.name),
+                ));
+            }
+        }
     }
 }
 
