@@ -50,14 +50,6 @@ pub fn sema(file: &ResolvedFile, resolver: &mut FileResolver, ns: &mut ast::Name
         // Checks for unused variables
         check_unused_namespace_variables(ns);
         check_unused_events(ns);
-
-        // Substrate: Every contrat must have at least one public message
-        if ns.target.is_substrate() && !ns.contracts.iter().any(|c| c.has_public_functions(ns)) {
-            ns.diagnostics.push(Diagnostic::warning(
-                pt::Loc::CommandLine,
-                format!("{} yields no public messages", file.full_path.display()),
-            ))
-        }
     }
 }
 
