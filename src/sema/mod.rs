@@ -51,17 +51,12 @@ pub fn sema(file: &ResolvedFile, resolver: &mut FileResolver, ns: &mut ast::Name
         check_unused_namespace_variables(ns);
         check_unused_events(ns);
 
-        // Substrate: Every contract must have at least one public message
-        if ns.target.is_substrate() {
-            for c in ns.contracts.iter() {
-                if c.has_public_functions(ns) || !c.is_concrete() {
-                    continue;
-                }
-                ns.diagnostics.push(Diagnostic::error(
-                    c.loc,
-                    format!("Contract '{}' has no public message", &c.name),
-                ));
-            }
+        // Substrate: Every contrat must have at least one public message
+        if ns.target.is_substrate() && !ns.contracts.iter().any(|c| c.has_public_functions(ns)) {
+            ns.diagnostics.push(Diagnostic::warning(
+                pt::Loc::CommandLine,
+                format!("{} yields no public messages", file.full_path.display()),
+            ))
         }
     }
 }
