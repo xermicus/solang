@@ -8,7 +8,7 @@ use self::{
 use crate::file_resolver::{FileResolver, ResolvedFile};
 use crate::sema::unused_variable::{check_unused_events, check_unused_namespace_variables};
 use num_bigint::BigInt;
-use solang_parser::{diagnostics::Diagnostic, doccomment::parse_doccomments, parse, pt};
+use solang_parser::{doccomment::parse_doccomments, parse, pt};
 use std::ffi::OsStr;
 
 mod address;

@@ -113,6 +113,20 @@ pub fn resolve(
     // Now we can resolve the initializers
     variables::resolve_initializers(&delayed.initializers, file_no, ns);
 
+    for (n, _) in contracts {
+        let contract = &ns.contracts[*n];
+        if ns.target.is_substrate()
+            && contract.is_concrete()
+            && !contract.has_public_function(ns)
+            && !ns.diagnostics.any_errors()
+        {
+            ns.diagnostics.push(ast::Diagnostic::error(
+            contract.loc,
+            "contracts without public storage or functions are not allowed on Substrate, considering declaring it abstract".into(),
+        ))
+        }
+    }
+
     // Now we can resolve the bodies
     if !resolve_bodies(delayed.function_bodies, file_no, ns) {
         // only if we could resolve all the bodies
@@ -693,14 +707,6 @@ fn check_inheritance(contract_no: usize, ns: &mut ast::Namespace) {
             ),
             notes,
         ));
-    }
-
-    let contract = &ns.contracts[contract_no];
-    if ns.target.is_substrate() && contract.is_concrete() && !contract.has_public_functions(ns) {
-        diagnostics.push(ast::Diagnostic::warning(
-            contract.loc,
-            format!("Contract '{}' has no public messages. Consider declaring it as an abstract contract instead.", contract.name),
-        ))
     }
 
     ns.diagnostics.extend(diagnostics);
