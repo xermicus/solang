@@ -103,11 +103,12 @@ fn resolve_ast(
         //  should reflect address_length for different substrate runtime
         ast::Type::Address(_) | ast::Type::Contract(_) => {
             // substituted to [u8 ;address_length]
+
             let address_ty = resolve_ast(
                 &ast::Type::Array(
                     Box::new(ast::Type::Uint(8)),
                     vec![ArrayLength::Fixed(
-                        BigInt::from_u8(ns.address_length as u8).unwrap(),
+                        BigInt::from_usize(ns.address_length).unwrap(),
                     )],
                 ),
                 ns,
@@ -120,12 +121,11 @@ fn resolve_ast(
 
             let c = TypeDefComposite::new(vec![field]);
 
-            let ty: Type<PortableForm> = Type::new(
-                Default::default(),
-                vec![],
-                TypeDef::Composite(c),
-                Default::default(),
-            );
+            let path: Path<PortableForm> =
+                serde_json::from_value(serde_json::json!(["AccountId"])).unwrap();
+
+            let ty: Type<PortableForm> =
+                Type::new(path, vec![], TypeDef::Composite(c), Default::default());
 
             get_or_register_ty(&ty, registry)
         }
@@ -211,12 +211,10 @@ fn resolve_ast(
 
             let c = TypeDefComposite::<PortableForm> { fields };
 
-            let ty = Type::new(
-                Default::default(),
-                vec![],
-                TypeDef::Composite(c),
-                Default::default(),
-            );
+            let path: Path<PortableForm> =
+                serde_json::from_value(serde_json::json!([def.name])).unwrap();
+
+            let ty = Type::new(path, vec![], TypeDef::Composite(c), Default::default());
 
             get_or_register_ty(&ty, registry)
         }
@@ -240,12 +238,10 @@ fn resolve_ast(
 
             let v = TypeDefVariant::new(variants);
 
-            let ty = Type::new(
-                Default::default(),
-                vec![],
-                TypeDef::Variant(v),
-                Default::default(),
-            );
+            let path: Path<PortableForm> =
+                serde_json::from_value(serde_json::json!([decl.name])).unwrap();
+
+            let ty = Type::new(path, vec![], TypeDef::Variant(v), Default::default());
 
             get_or_register_ty(&ty, registry)
         }
@@ -269,12 +265,10 @@ fn resolve_ast(
 
             let c = TypeDefComposite { fields };
 
-            let ty = Type::new(
-                Default::default(),
-                vec![],
-                TypeDef::Composite(c),
-                Default::default(),
-            );
+            let path: Path<PortableForm> =
+                serde_json::from_value(serde_json::json!(["ExternalFunction"])).unwrap();
+
+            let ty = Type::new(path, vec![], TypeDef::Composite(c), Default::default());
 
             get_or_register_ty(&ty, registry)
         }
@@ -424,8 +418,11 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> InkProject {
 
                 let c = TypeDefComposite { fields };
 
+                let display_name: Path<PortableForm> =
+                    serde_json::from_value(serde_json::json!(["return_type"])).unwrap();
+
                 let ty = Type::new(
-                    Default::default(),
+                    display_name,
                     vec![],
                     TypeDef::Composite(c),
                     Default::default(),
@@ -477,9 +474,12 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> InkProject {
             Some(func)
         })
         .filter(|f| match f.visibility {
-            pt::Visibility::Public(_) | pt::Visibility::External(_) => {
-                f.ty == pt::FunctionTy::Function
-            }
+            pt::Visibility::Public(_) | pt::Visibility::External(_) => match f.ty {
+                pt::FunctionTy::Function | pt::FunctionTy::Fallback | pt::FunctionTy::Receive => {
+                    true
+                }
+                _ => false,
+            },
             _ => false,
         })
         .map(|f| f_to_message(f))
