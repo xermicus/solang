@@ -29,17 +29,21 @@ use crate::sema::{
     tags::render,
 };
 
+fn path_from_str(s: impl Into<String>) -> Path<PortableForm> {
+    serde_json::from_value::<Path<PortableForm>>(serde_json::json!(vec![s.into()])).unwrap()
+}
+
 fn primitive_to_ty(ty: &ast::Type, registry: &mut PortableRegistry) -> Type<PortableForm> {
     match ty {
         ast::Type::Int(_) | ast::Type::Uint(_) => int_to_ty(ty, registry),
         ast::Type::Bool => Type::new(
-            Default::default(),
+            path_from_str("bool"),
             vec![],
             TypeDef::Primitive(TypeDefPrimitive::Bool),
             Default::default(),
         ),
         ast::Type::String => Type::new(
-            Default::default(),
+            path_from_str("string"),
             vec![],
             TypeDef::Primitive(TypeDefPrimitive::Str),
             Default::default(),
@@ -73,12 +77,10 @@ fn int_to_ty(ty: &ast::Type, registry: &mut PortableRegistry) -> Type<PortableFo
         _ => unreachable!(),
     };
 
-    let ty = Type::new(
-        Default::default(),
-        vec![],
-        TypeDef::Primitive(def),
-        Default::default(),
-    );
+    let path =
+        serde_json::from_value::<Path<PortableForm>>(serde_json::json!(vec![scalety])).unwrap();
+
+    let ty = Type::new(path, vec![], TypeDef::Primitive(def), Default::default());
 
     get_or_register_ty(&ty, registry);
 
@@ -121,8 +123,9 @@ fn resolve_ast(
 
             let c = TypeDefComposite::new(vec![field]);
 
-            let path: Path<PortableForm> =
-                serde_json::from_value(serde_json::json!(["AccountId"])).unwrap();
+            let path =
+                serde_json::from_value::<Path<PortableForm>>(serde_json::json!(vec!["AccountId"]))
+                    .unwrap();
 
             let ty: Type<PortableForm> =
                 Type::new(path, vec![], TypeDef::Composite(c), Default::default());
@@ -340,7 +343,7 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> InkProject {
             .map(|p| {
                 let ty = resolve_ast(&p.ty, ns, &mut registry, &mut cache);
 
-                let spec = TypeSpec::new_from_ty(ty.id().into(), Default::default());
+                let spec = TypeSpec::new_from_ty(ty.id().into(), ty.ty().path().clone());
 
                 MessageParamSpec::new_custom(p.name_as_str().to_string(), spec)
             })
@@ -390,7 +393,7 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> InkProject {
             1 => {
                 let ty = resolve_ast(&f.returns[0].ty, ns, &mut registry, &mut cache);
 
-                let spec = TypeSpec::new_from_ty(ty.id().into(), Default::default());
+                let spec = TypeSpec::new_from_ty(ty.id().into(), ty.ty().path().clone());
 
                 Some(spec)
             }
@@ -402,7 +405,7 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> InkProject {
                     .map(|r_p| {
                         let ty = resolve_ast(&r_p.ty, ns, &mut registry, &mut cache);
 
-                        let f_spec = TypeSpec::new_from_ty(ty.id().into(), Default::default());
+                        let f_spec = TypeSpec::new_from_ty(ty.id().into(), ty.ty().path().clone());
 
                         // TODO: `ink_metadata` mandates all field to be named or all unnamed, should we follow this for return type in case of partially named field?
                         let name = r_p.id.clone().map(|i| i.name);
@@ -430,7 +433,10 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> InkProject {
 
                 let ty = get_or_register_ty(&ty, &mut registry);
 
-                Some(TypeSpec::new_from_ty(ty.id().into(), Path::default()))
+                Some(TypeSpec::new_from_ty(
+                    ty.id().into(),
+                    ty.ty().path().clone(),
+                ))
             }
         };
 
@@ -442,7 +448,7 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> InkProject {
             .map(|p| {
                 let ty = resolve_ast(&p.ty, ns, &mut registry, &mut cache);
 
-                let spec = TypeSpec::new_from_ty(ty.id().into(), Default::default());
+                let spec = TypeSpec::new_from_ty(ty.id().into(), ty.ty().path().clone());
 
                 MessageParamSpec::new_custom(p.name_as_str().to_string(), spec)
             })
@@ -494,7 +500,7 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> InkProject {
 
                 let ty = resolve_ast(&p.ty, ns, &mut registry, &mut cache);
 
-                let spec = TypeSpec::new_from_ty(ty.id().into(), Default::default());
+                let spec = TypeSpec::new_from_ty(ty.id().into(), ty.ty().path().clone());
 
                 EventParamSpec::new_custom(label, spec)
                     .indexed(p.indexed)
