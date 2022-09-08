@@ -5,11 +5,10 @@ use contract_metadata::{
     CodeHash, Compiler, Contract, ContractMetadata, Language, Source, SourceCompiler,
     SourceLanguage, SourceWasm,
 };
-use hex::FromHex;
 use ink_metadata::{
-    layout::{CellLayout, FieldLayout, Layout, LayoutKey, StructLayout},
+    layout::{FieldLayout, Layout, LayoutKey, LeafLayout, StructLayout},
     ConstructorSpec, ContractSpec, EventParamSpec, EventSpec, InkProject, MessageParamSpec,
-    MessageSpec, MetadataVersioned, ReturnTypeSpec, TypeSpec,
+    MessageSpec, ReturnTypeSpec, TypeSpec,
 };
 
 use itertools::Itertools;
@@ -314,16 +313,13 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> InkProject {
 
             //mappings and large types cannot be represented
             if !var.ty.contains_mapping(ns) && var.ty.fits_in_memory(ns) {
-                let key_str = format!("{:064X}", layout.slot);
-                let key_val = <[u8; 32]>::from_hex(key_str).unwrap();
-
-                let layout_key = LayoutKey::new(key_val);
+                let layout_key = LayoutKey::new(layout.slot.to_u32().unwrap());
 
                 let ty = resolve_ast(&layout.ty, ns, &mut registry, &mut cache);
 
-                let cell = CellLayout::new_from_ty(layout_key, ty.id().into());
+                let leaf = LeafLayout::new_from_ty(layout_key, ty.id().into());
 
-                let f = FieldLayout::new_custom(var.name.clone(), Layout::Cell(cell));
+                let f = FieldLayout::new_custom(var.name.clone(), Layout::Leaf(leaf));
 
                 Some(f)
             } else {
@@ -332,8 +328,8 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> InkProject {
         })
         .collect();
 
-    // TODO: storage layout is Struct { fields: Vec<CellLayout<InnerTy>> }, is there any usage for other layout types?
-    let layout = Layout::Struct(StructLayout::new(fields));
+    // FIXME: what shoudl be the name of the storage?
+    let layout = Layout::Struct(StructLayout::new(String::new(), fields));
 
     let mut f_to_constructor = |f: &Function| -> ConstructorSpec<PortableForm> {
         let payable = matches!(f.mutability, ast::Mutability::Payable(_));
@@ -480,12 +476,10 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> InkProject {
             Some(func)
         })
         .filter(|f| match f.visibility {
-            pt::Visibility::Public(_) | pt::Visibility::External(_) => match f.ty {
-                pt::FunctionTy::Function | pt::FunctionTy::Fallback | pt::FunctionTy::Receive => {
-                    true
-                }
-                _ => false,
-            },
+            pt::Visibility::Public(_) | pt::Visibility::External(_) => matches!(
+                f.ty,
+                pt::FunctionTy::Function | pt::FunctionTy::Fallback | pt::FunctionTy::Receive
+            ),
             _ => false,
         })
         .map(|f| f_to_message(f))
@@ -588,10 +582,8 @@ pub fn metadata(contract_no: usize, code: &[u8], ns: &ast::Namespace) -> Value {
 
     let project = gen_project(contract_no, ns);
 
-    let ink_metadata = MetadataVersioned::from(project);
-
     let abi_json: Map<String, Value> =
-        serde_json::from_value(serde_json::to_value(ink_metadata).unwrap()).unwrap();
+        serde_json::from_value(serde_json::to_value(project).unwrap()).unwrap();
 
     let metadata = ContractMetadata::new(source, contract, None, abi_json);
 
@@ -602,13 +594,5 @@ pub fn metadata(contract_no: usize, code: &[u8], ns: &ast::Namespace) -> Value {
 pub fn load(s: &str) -> InkProject {
     let bundle = serde_json::from_str::<ContractMetadata>(s).unwrap();
 
-    let abi =
-        serde_json::from_value::<MetadataVersioned>(serde_json::to_value(bundle.abi).unwrap())
-            .unwrap();
-
-    if let MetadataVersioned::V3(project) = abi {
-        project
-    } else {
-        panic!("can only load MetadataVersioned::V3")
-    }
+    serde_json::from_value::<InkProject>(serde_json::to_value(bundle.abi).unwrap()).unwrap()
 }
