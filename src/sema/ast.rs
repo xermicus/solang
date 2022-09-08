@@ -640,17 +640,6 @@ impl Contract {
             })
             .cloned()
     }
-
-    /// Does this contract have at least one public function
-    pub fn has_public_function(&self, ns: &Namespace) -> bool {
-        self.all_functions.keys().any(|func_no| {
-            let function = &ns.functions[*func_no];
-            match function.ty {
-                pt::FunctionTy::Function | pt::FunctionTy::Receive => function.is_public(),
-                _ => false,
-            }
-        })
-    }
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
