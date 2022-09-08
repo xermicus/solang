@@ -15,7 +15,7 @@ use itertools::Itertools;
 use serde_json::{Map, Value};
 
 use num_bigint::BigInt;
-use num_traits::{FromPrimitive, ToPrimitive};
+use num_traits::ToPrimitive;
 use scale_info::{
     form::PortableForm, registry::PortableType, Field, Path, PortableRegistry, Type, TypeDef,
     TypeDefArray, TypeDefComposite, TypeDefPrimitive, TypeDefSequence, TypeDefVariant, Variant,
@@ -108,9 +108,7 @@ fn resolve_ast(
             let address_ty = resolve_ast(
                 &ast::Type::Array(
                     Box::new(ast::Type::Uint(8)),
-                    vec![ArrayLength::Fixed(
-                        BigInt::from_usize(ns.address_length).unwrap(),
-                    )],
+                    vec![ArrayLength::Fixed(BigInt::from(ns.address_length))],
                 ),
                 ns,
                 registry,
