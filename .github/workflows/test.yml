@@ -72,7 +72,8 @@ jobs:
     - uses: actions/upload-artifact@master
       with:
         name: solang-linux-x86-64
-        path: ./target/debug/solang
+        path: ./target/debug/solang 
+
 
   linux-arm:
     name: Linux Arm
@@ -286,6 +287,38 @@ jobs:
     - name: Deploy and test contracts
       run: npm run test
       working-directory: ./integration/substrate
+
+  substrate-subxt:
+    name: Substrate Integration test with subxt
+    runs-on: ubuntu-20.04
+    needs: linux-x86-64
+    steps:
+    - name: Checkout sources
+      uses: actions/checkout@v2
+      # We can't run substrate as a github actions service, since it requires
+      # command line arguments. See https://github.com/actions/runner/pull/1152
+    - name: Start substrate
+      run: docker run -d -p 9944:9944 paritytech/contracts-ci-linux:production substrate-contracts-node --dev --ws-external
+    - uses: actions/download-artifact@master
+      with:
+        name: solang-linux-x86-64
+        path: bin
+    - run: |
+        chmod 755 ./bin/solang
+        echo "$(pwd)/bin" >> $GITHUB_PATH
+    - name: Install latest rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        default: true
+        override: true   
+    - run: solang compile --target substrate ../substrate/*.sol -o ./contracts/
+      working-directory: ./integration/subxt-tests
+    - run: solang compile --target substrate ../substrate/test/*.sol -o ./contracts/
+      working-directory: ./integration/subxt-tests
+    - name: Deploy and test contracts
+      run: cargo test -- --test-threads=1
+      working-directory: ./integration/subxt-tests
 
   vscode:
     name: Visual Code Extension

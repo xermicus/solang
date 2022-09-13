@@ -17,9 +17,9 @@ use serde_json::{Map, Value};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use scale_info::{
-    form::PortableForm, interner::UntrackedSymbol, registry::PortableType, Field, Path,
-    PortableRegistry, Type, TypeDef, TypeDefArray, TypeDefComposite, TypeDefPrimitive,
-    TypeDefSequence, TypeDefTuple, TypeDefVariant, Variant,
+    form::PortableForm, registry::PortableType, Field, Path, PortableRegistry, Type, TypeDef,
+    TypeDefArray, TypeDefComposite, TypeDefPrimitive, TypeDefSequence, TypeDefTuple,
+    TypeDefVariant, Variant,
 };
 use semver::Version;
 use solang_parser::pt;
@@ -117,7 +117,12 @@ fn resolve_ast(
             );
 
             // substituded to struct { AccountId }
-            let field = Field::new(None, address_ty.id().into(), None, vec![]);
+            let field = Field::new(
+                None,
+                address_ty.id().into(),
+                Some("[u8; 32]".into()),
+                vec![],
+            );
 
             let c = TypeDefComposite::new(vec![field]);
 
