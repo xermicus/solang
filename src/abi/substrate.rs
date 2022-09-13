@@ -17,8 +17,9 @@ use serde_json::{Map, Value};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use scale_info::{
-    form::PortableForm, registry::PortableType, Field, Path, PortableRegistry, Type, TypeDef,
-    TypeDefArray, TypeDefComposite, TypeDefPrimitive, TypeDefSequence, TypeDefVariant, Variant,
+    form::PortableForm, interner::UntrackedSymbol, registry::PortableType, Field, Path,
+    PortableRegistry, Type, TypeDef, TypeDefArray, TypeDefComposite, TypeDefPrimitive,
+    TypeDefSequence, TypeDefTuple, TypeDefVariant, Variant,
 };
 use semver::Version;
 use solang_parser::pt;
@@ -399,31 +400,16 @@ pub fn gen_project(contract_no: usize, ns: &ast::Namespace) -> InkProject {
                     .map(|r_p| {
                         let ty = resolve_ast(&r_p.ty, ns, &mut registry, &mut cache);
 
-                        let f_spec = TypeSpec::new_from_ty(ty.id().into(), ty.ty().path().clone());
-
-                        // TODO: `ink_metadata` mandates all field to be named or all unnamed, should we follow this for return type in case of partially named field?
-                        let name = r_p.id.clone().map(|i| i.name);
-
-                        Field::new(
-                            name,
-                            *f_spec.ty(),
-                            Some(f_spec.display_name().to_string()),
-                            Default::default(),
-                        )
+                        ty.id().into()
                     })
                     .collect::<Vec<_>>();
 
-                let c = TypeDefComposite { fields };
+                let t = TypeDefTuple::new_custom(fields);
 
                 let display_name: Path<PortableForm> =
                     serde_json::from_value(serde_json::json!(["return_type"])).unwrap();
 
-                let ty = Type::new(
-                    display_name,
-                    vec![],
-                    TypeDef::Composite(c),
-                    Default::default(),
-                );
+                let ty = Type::new(display_name, vec![], TypeDef::Tuple(t), Default::default());
 
                 let ty = get_or_register_ty(&ty, &mut registry);
 
