@@ -2,7 +2,7 @@ use contract_transcode::ContractMessageTranscoder;
 use parity_scale_codec::{Decode, Encode, Input};
 use sp_core::{crypto::AccountId32, hexdisplay::AsBytesRef};
 
-use crate::{load_project, DeployContract, Execution, ReadContract, WriteContract, API};
+use crate::{load_project, Contract, DeployContract, Execution, ReadContract, WriteContract, API};
 
 #[tokio::test]
 async fn case() -> anyhow::Result<()> {
@@ -12,11 +12,11 @@ async fn case() -> anyhow::Result<()> {
     let mytoken_code = std::fs::read("./contracts/mytoken.wasm")?;
     let mytoken_event_code = std::fs::read("./contracts/mytokenEvent.wasm")?;
 
-    let p_mytoken = load_project("./contracts/mytoken.contract")?;
-    let t_mytoken = ContractMessageTranscoder::new(&p_mytoken);
+    let c_mytoken = Contract::new("./contracts/mytoken.contract")?;
+    let t_mytoken = &c_mytoken.transcoder;
 
-    let p_mytoken_evt = load_project("./contracts/mytokenEvent.contract")?;
-    let t_mytoken_evt = ContractMessageTranscoder::new(&p_mytoken_evt);
+    let c_mytoken_evt = Contract::new("./contracts/mytokenEvent.contract")?;
+    let t_mytoken_evt = &c_mytoken_evt.transcoder;
 
     let selector = t_mytoken.encode::<_, String>("new", [])?;
 

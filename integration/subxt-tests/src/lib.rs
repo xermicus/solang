@@ -1,7 +1,7 @@
 use std::{borrow::Borrow, path::Path};
 
 use contract_transcode::ContractMessageTranscoder;
-use ink_metadata::{InkProject, MetadataVersioned};
+use ink_metadata::{InkProject, MetadataVersion};
 
 use jsonschema::JSONSchema;
 use once_cell::sync::Lazy;
@@ -372,27 +372,21 @@ async fn read_call(
     })
 }
 
-static SCHEMA: Lazy<JSONSchema> = Lazy::new(|| {
-    let raw = include_bytes!("../ink-v3-schema.json");
-    let val: serde_json::Value = serde_json::from_slice(raw).unwrap();
+// static SCHEMA: Lazy<JSONSchema> = Lazy::new(|| {
+//     let raw = include_bytes!("../ink-v3-schema.json");
+//     let val: serde_json::Value = serde_json::from_slice(raw).unwrap();
 
-    JSONSchema::compile(&val).unwrap()
-});
+//     JSONSchema::compile(&val).unwrap()
+// });
 
 fn load_versioned_metadata(contract: &ContractMetadata) -> anyhow::Result<InkProject> {
     let abi_json = serde_json::Value::Object(contract.abi.clone());
 
-    let schema = SCHEMA.borrow();
+    // let schema = SCHEMA.borrow();
+    // assert!(schema.is_valid(&abi_json));
 
-    assert!(schema.is_valid(&abi_json));
-
-    let ink_metadata = serde_json::from_value::<MetadataVersioned>(abi_json)?;
-
-    if let MetadataVersioned::V3(project) = ink_metadata {
-        Ok(project)
-    } else {
-        Err(anyhow::anyhow!("expecting MetadataVersionedV3"))
-    }
+    let project = serde_json::from_value::<InkProject>(abi_json).unwrap();
+    Ok(project)
 }
 
 pub fn load_project(path: impl AsRef<Path>) -> anyhow::Result<InkProject> {
@@ -413,7 +407,7 @@ pub async fn free_balance_of(api: &API, addr: AccountId32) -> anyhow::Result<u12
 
 struct Contract {
     path: &'static str,
-    project: InkProject,
+    transcoder: ContractMessageTranscoder,
     blob: Vec<u8>,
     address: Option<AccountId32>,
 }
@@ -425,6 +419,8 @@ impl Contract {
         let contract: ContractMetadata = serde_json::from_reader(r)?;
         let project = load_versioned_metadata(&contract)?;
 
+        let transcoder = ContractMessageTranscoder::new(project);
+
         let blob = contract
             .source
             .wasm
@@ -433,7 +429,7 @@ impl Contract {
 
         Ok(Self {
             path,
-            project,
+            transcoder,
             blob,
             address: None,
         })
@@ -462,9 +458,9 @@ impl Contract {
         api: &API,
         caller: sp_keyring::AccountKeyring,
         value: u128,
-        build_selector: impl Fn(ContractMessageTranscoder<'_>) -> Vec<u8>,
+        build_selector: impl Fn(&ContractMessageTranscoder) -> Vec<u8>,
     ) -> anyhow::Result<Vec<node::contracts::events::ContractEmitted>> {
-        let transcoder = ContractMessageTranscoder::new(&self.project);
+        let transcoder = &self.transcoder;
 
         let selector = build_selector(transcoder);
 
@@ -488,9 +484,9 @@ impl Contract {
         api: &API,
         caller: sp_keyring::AccountKeyring,
         value: u128,
-        build_selector: impl Fn(ContractMessageTranscoder<'_>) -> Vec<u8>,
+        build_selector: impl Fn(&ContractMessageTranscoder) -> Vec<u8>,
     ) -> anyhow::Result<Vec<node::contracts::events::ContractEmitted>> {
-        let transcoder = ContractMessageTranscoder::new(&self.project);
+        let transcoder = &self.transcoder;
 
         let selector = build_selector(transcoder);
 
@@ -511,10 +507,9 @@ impl Contract {
         api: &API,
         caller: sp_keyring::AccountKeyring,
         value: u128,
-        build_selector: impl Fn(ContractMessageTranscoder<'_>) -> Vec<u8>,
+        build_selector: impl Fn(&ContractMessageTranscoder) -> Vec<u8>,
     ) -> anyhow::Result<Vec<u8>> {
-        let transcoder = ContractMessageTranscoder::new(&self.project);
-
+        let transcoder = &self.transcoder;
         let selector = build_selector(transcoder);
 
         let out = ReadContract {

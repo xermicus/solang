@@ -23,7 +23,7 @@ async fn setup() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| t.encode::<_, String>("feeTo", []).unwrap(),
+            &|t: &ContractMessageTranscoder| t.encode::<_, String>("feeTo", []).unwrap(),
         )
         .await
         .and_then(|v| <AccountId32>::decode(&mut &v[..]).map_err(Into::into))?;
@@ -39,7 +39,7 @@ async fn setup() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| t.encode::<_, String>("feeToSetter", []).unwrap(),
+            &|t: &ContractMessageTranscoder| t.encode::<_, String>("feeToSetter", []).unwrap(),
         )
         .await
         .and_then(|v| <AccountId32>::decode(&mut &v[..]).map_err(Into::into))?;
@@ -52,9 +52,7 @@ async fn setup() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
-                t.encode::<_, String>("allPairsLength", []).unwrap()
-            },
+            &|t: &ContractMessageTranscoder| t.encode::<_, String>("allPairsLength", []).unwrap(),
         )
         .await
         .and_then(|v| <u8>::decode(&mut &v[..]).map_err(Into::into))?;
@@ -75,7 +73,7 @@ async fn test_pair() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
+            &|t: &ContractMessageTranscoder| {
                 t.encode::<_, String>(
                     "createPair",
                     [
@@ -118,7 +116,7 @@ async fn test_pair_reverse() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
+            &|t: &ContractMessageTranscoder| {
                 t.encode::<_, String>(
                     "createPair",
                     [
@@ -161,7 +159,7 @@ async fn set_fee_to() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
+            &|t: &ContractMessageTranscoder| {
                 t.encode::<_, String>(
                     "setFeeTo",
                     [format!(
@@ -180,7 +178,7 @@ async fn set_fee_to() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| t.encode::<_, String>("feeTo", []).unwrap(),
+            &|t: &ContractMessageTranscoder| t.encode::<_, String>("feeTo", []).unwrap(),
         )
         .await
         .and_then(|v| <AccountId32>::decode(&mut &v[..]).map_err(Into::into))?;
@@ -201,7 +199,7 @@ async fn set_fee_to_setter() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
+            &|t: &ContractMessageTranscoder| {
                 t.encode::<_, String>(
                     "setFeeToSetter",
                     [format!(
@@ -220,7 +218,7 @@ async fn set_fee_to_setter() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| t.encode::<_, String>("feeToSetter", []).unwrap(),
+            &|t: &ContractMessageTranscoder| t.encode::<_, String>("feeToSetter", []).unwrap(),
         )
         .await
         .and_then(|v| <AccountId32>::decode(&mut &v[..]).map_err(Into::into))?;
@@ -247,7 +245,7 @@ impl MockWorld {
                 api,
                 sp_keyring::AccountKeyring::Alice,
                 10_u128.pow(16),
-                &|t: ContractMessageTranscoder<'_>| {
+                &|t: &ContractMessageTranscoder| {
                     t.encode::<_, String>(
                         "new",
                         [format!(

@@ -2,7 +2,7 @@ use contract_transcode::ContractMessageTranscoder;
 use parity_scale_codec::{Decode, Encode};
 use sp_core::{crypto::AccountId32, hexdisplay::AsBytesRef};
 
-use crate::{load_project, DeployContract, Execution, ReadContract, WriteContract, API};
+use crate::{load_project, Contract, DeployContract, Execution, ReadContract, WriteContract, API};
 
 #[tokio::test]
 async fn case() -> anyhow::Result<()> {
@@ -12,14 +12,14 @@ async fn case() -> anyhow::Result<()> {
     let callee_code = std::fs::read("./contracts/callee.wasm")?;
     let callee2_code = std::fs::read("./contracts/callee2.wasm")?;
 
-    let p_caller = load_project("./contracts/caller.contract")?;
-    let t_caller = ContractMessageTranscoder::new(&p_caller);
+    let c_caller = Contract::new("./contracts/caller.contract")?;
+    let t_caller = &c_caller.transcoder;
 
-    let p_callee = load_project("./contracts/callee.contract")?;
-    let t_callee = ContractMessageTranscoder::new(&p_callee);
+    let c_callee = Contract::new("./contracts/callee.contract")?;
+    let t_callee = &c_callee.transcoder;
 
-    let p_callee2 = load_project("./contracts/callee2.contract")?;
-    let t_callee2 = ContractMessageTranscoder::new(&p_callee2);
+    let c_callee2 = Contract::new("./contracts/callee2.contract")?;
+    let t_callee2 = &c_caller.transcoder;
 
     let selector = t_caller.encode::<_, String>("new", [])?;
 

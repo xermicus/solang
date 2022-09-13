@@ -6,7 +6,7 @@ use rand::Rng;
 use sp_core::{crypto::AccountId32, hexdisplay::AsBytesRef, keccak_256, U256};
 use subxt::ext::bitvec::macros::internal::funty::Numeric;
 
-use crate::{load_project, DeployContract, Execution, ReadContract, WriteContract, API};
+use crate::{load_project, Contract, DeployContract, Execution, ReadContract, WriteContract, API};
 
 #[tokio::test]
 async fn setup() -> anyhow::Result<()> {
@@ -14,7 +14,7 @@ async fn setup() -> anyhow::Result<()> {
 
     let w = MockWorld::init(&api).await?;
 
-    let transcoder = ContractMessageTranscoder::new(&w.project);
+    let transcoder = &w.contract.transcoder;
 
     let selector = transcoder.encode::<_, String>("name", [])?;
 
@@ -145,7 +145,7 @@ struct MockWorld {
     alice: AccountId32,
     dave: AccountId32,
     token_addr: AccountId32,
-    project: InkProject,
+    contract: Contract,
 }
 
 #[tokio::test]
@@ -154,7 +154,7 @@ async fn approve() -> anyhow::Result<()> {
 
     let w = MockWorld::init(&api).await?;
 
-    let transcoder = ContractMessageTranscoder::new(&w.project);
+    let transcoder = &w.contract.transcoder;
 
     let mut selector = transcoder.encode("approve", [format!("0x{}", hex::encode(&w.dave))])?;
 
@@ -198,7 +198,7 @@ async fn transfer() -> anyhow::Result<()> {
 
     let w = MockWorld::init(&api).await?;
 
-    let transcoder = ContractMessageTranscoder::new(&w.project);
+    let transcoder = &w.contract.transcoder;
 
     let mut selector = transcoder.encode("transfer", [format!("0x{}", hex::encode(&w.dave))])?;
     U256::from(10_u128.pow(18)).encode_to(&mut selector);
@@ -259,7 +259,7 @@ async fn transfer_from() -> anyhow::Result<()> {
 
     let w = MockWorld::init(&api).await?;
 
-    let transcoder = ContractMessageTranscoder::new(&w.project);
+    let transcoder = &w.contract.transcoder;
 
     let mut selector = transcoder.encode("approve", [format!("0x{}", hex::encode(&w.dave))])?;
     U256::from(10_u128.pow(18)).encode_to(&mut selector);
@@ -358,7 +358,7 @@ async fn transfer_from_max() -> anyhow::Result<()> {
 
     let w = MockWorld::init(&api).await?;
 
-    let transcoder = ContractMessageTranscoder::new(&w.project);
+    let transcoder = &w.contract.transcoder;
 
     let mut selector = transcoder.encode("approve", [format!("0x{}", hex::encode(&w.dave))])?;
     U256::MAX.encode_to(&mut selector);
@@ -457,9 +457,9 @@ impl MockWorld {
         let dave: AccountId32 = sp_keyring::AccountKeyring::Dave.to_account_id();
         let code = std::fs::read("./contracts/ERC20.wasm")?;
 
-        let p = load_project("./contracts/ERC20.contract")?;
+        let c = Contract::new("./contracts/ERC20.contract")?;
 
-        let transcoder = ContractMessageTranscoder::new(&p);
+        let transcoder = &c.transcoder;
 
         let mut selector = transcoder.encode::<_, String>("new", [])?;
 
@@ -478,7 +478,7 @@ impl MockWorld {
             alice,
             dave,
             token_addr: contract.contract_address,
-            project: p,
+            contract: c,
         })
     }
 }

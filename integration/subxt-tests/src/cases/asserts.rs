@@ -18,7 +18,7 @@ async fn case() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| t.encode::<_, String>("new", []).unwrap(),
+            &|t: &ContractMessageTranscoder| t.encode::<_, String>("new", []).unwrap(),
         )
         .await?;
 
@@ -27,7 +27,7 @@ async fn case() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| t.encode::<_, String>("var", []).unwrap(),
+            &|t: &ContractMessageTranscoder| t.encode::<_, String>("var", []).unwrap(),
         )
         .await?;
 
@@ -40,9 +40,7 @@ async fn case() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
-                t.encode::<_, String>("test_assert_rpc", []).unwrap()
-            },
+            &|t: &ContractMessageTranscoder| t.encode::<_, String>("test_assert_rpc", []).unwrap(),
         )
         .await;
 
@@ -56,9 +54,7 @@ async fn case() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
-                t.encode::<_, String>("test_assert_rpc", []).unwrap()
-            },
+            &|t: &ContractMessageTranscoder| t.encode::<_, String>("test_assert_rpc", []).unwrap(),
         )
         .await;
 
@@ -72,7 +68,7 @@ async fn case() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| t.encode::<_, String>("var", []).unwrap(),
+            &|t: &ContractMessageTranscoder| t.encode::<_, String>("var", []).unwrap(),
         )
         .await?;
 

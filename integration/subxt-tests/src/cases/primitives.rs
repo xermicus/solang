@@ -7,7 +7,7 @@ use parity_scale_codec::{Decode, Encode, Input};
 use sp_core::{crypto::AccountId32, hexdisplay::AsBytesRef, H256, U256};
 use subxt::ext::sp_runtime::{traits::One, MultiAddress};
 
-use crate::{load_project, DeployContract, Execution, ReadContract, WriteContract, API};
+use crate::{load_project, Contract, DeployContract, Execution, ReadContract, WriteContract, API};
 
 async fn query<T: Decode>(api: &API, addr: &AccountId32, selector: &[u8]) -> anyhow::Result<T> {
     ReadContract {
@@ -26,9 +26,9 @@ async fn case() -> anyhow::Result<()> {
     let api = API::new().await?;
     let code = std::fs::read("./contracts/primitives.wasm")?;
 
-    let p = load_project("./contracts/primitives.contract")?;
+    let c = Contract::new("contracts/primitives.contract")?;
 
-    let transcoder = ContractMessageTranscoder::new(&p);
+    let transcoder = &c.transcoder;
 
     let selector = transcoder.encode::<_, String>("new", [])?;
 

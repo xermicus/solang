@@ -17,7 +17,7 @@ async fn case() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| t.encode::<_, String>("new", []).unwrap(),
+            &|t: &ContractMessageTranscoder| t.encode::<_, String>("new", []).unwrap(),
         )
         .await?;
 
@@ -44,7 +44,7 @@ async fn case() -> anyhow::Result<()> {
                 &api,
                 sp_keyring::AccountKeyring::Alice,
                 0,
-                &|t: ContractMessageTranscoder<'_>| {
+                &|t: &ContractMessageTranscoder| {
                     t.encode(
                         "addUser",
                         [
@@ -69,7 +69,7 @@ async fn case() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
+            &|t: &ContractMessageTranscoder| {
                 t.encode("getUserById", [format!("\"{id}\"")]).unwrap()
             },
         )
@@ -86,7 +86,7 @@ async fn case() -> anyhow::Result<()> {
                 &api,
                 sp_keyring::AccountKeyring::Alice,
                 0,
-                &|t: ContractMessageTranscoder<'_>| {
+                &|t: &ContractMessageTranscoder| {
                     t.encode(
                         "hasPermission",
                         [format!("\"{id}\""), format!("Perm{}", p + 1)],

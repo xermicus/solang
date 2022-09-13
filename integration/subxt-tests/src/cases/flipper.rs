@@ -2,15 +2,15 @@ use contract_transcode::ContractMessageTranscoder;
 use parity_scale_codec::{Decode, Encode};
 use sp_core::hexdisplay::AsBytesRef;
 
-use crate::{load_project, DeployContract, Execution, ReadContract, WriteContract, API};
+use crate::{load_project, Contract, DeployContract, Execution, ReadContract, WriteContract, API};
 
 #[tokio::test]
 async fn case() -> anyhow::Result<()> {
     let api = API::new().await?;
 
     let code = std::fs::read("./contracts/flipper.wasm")?;
-    let p = load_project("./contracts/flipper.contract")?;
-    let transcoder = ContractMessageTranscoder::new(&p);
+    let c = Contract::new("./contracts/flipper.contract")?;
+    let transcoder = &c.transcoder;
 
     let selector = transcoder.encode::<_, String>("new", ["true".into()])?;
 

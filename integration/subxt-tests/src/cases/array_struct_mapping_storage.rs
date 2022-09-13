@@ -15,7 +15,7 @@ async fn case() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| t.encode::<_, String>("new", []).unwrap(),
+            &|t: &ContractMessageTranscoder| t.encode::<_, String>("new", []).unwrap(),
         )
         .await?;
 
@@ -24,13 +24,11 @@ async fn case() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
-                t.encode::<_, _>("setNumber", ["2147483647"]).unwrap()
-            },
+            &|t: &ContractMessageTranscoder| t.encode::<_, _>("setNumber", ["2147483647"]).unwrap(),
         )
         .await?;
 
-    let b_push = |t: ContractMessageTranscoder<'_>| t.encode::<_, String>("push", []).unwrap();
+    let b_push = |t: &ContractMessageTranscoder| t.encode::<_, String>("push", []).unwrap();
 
     contract
         .call(&api, sp_keyring::AccountKeyring::Alice, 0, &b_push)
@@ -47,7 +45,7 @@ async fn case() -> anyhow::Result<()> {
                     &api,
                     sp_keyring::AccountKeyring::Alice,
                     0,
-                    &|t: ContractMessageTranscoder<'_>| {
+                    &|t: &ContractMessageTranscoder| {
                         t.encode::<_, _>(
                             "set",
                             [
@@ -70,7 +68,7 @@ async fn case() -> anyhow::Result<()> {
                     &api,
                     sp_keyring::AccountKeyring::Alice,
                     0,
-                    &|t: ContractMessageTranscoder<'_>| {
+                    &|t: &ContractMessageTranscoder| {
                         t.encode::<_, _>(
                             "get",
                             [
@@ -93,7 +91,7 @@ async fn case() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
+            &|t: &ContractMessageTranscoder| {
                 t.encode::<_, _>("rm", [format!("{}", 0), format!("{}", 104)])
                     .unwrap()
             },
@@ -106,7 +104,7 @@ async fn case() -> anyhow::Result<()> {
                 &api,
                 sp_keyring::AccountKeyring::Alice,
                 0,
-                &|t: ContractMessageTranscoder<'_>| {
+                &|t: &ContractMessageTranscoder| {
                     t.encode::<_, _>("get", [format!("{}", 0), format!("{}", 102 + i)])
                         .unwrap()
                 },
@@ -126,7 +124,7 @@ async fn case() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| t.encode::<_, String>("number", []).unwrap(),
+            &|t: &ContractMessageTranscoder| t.encode::<_, String>("number", []).unwrap(),
         )
         .await
         .and_then(|v| <i64>::decode(&mut v.as_bytes_ref()).map_err(Into::into))?;

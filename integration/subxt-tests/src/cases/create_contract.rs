@@ -6,8 +6,8 @@ use parity_scale_codec::{Decode, Encode};
 use sp_core::{crypto::AccountId32, hexdisplay::AsBytesRef, H256};
 
 use crate::{
-    free_balance_of, load_project, node, DeployContract, Execution, ReadContract, ReadLayout,
-    WriteContract, API,
+    free_balance_of, load_project, node, Contract, DeployContract, Execution, ReadContract,
+    ReadLayout, WriteContract, API,
 };
 
 #[tokio::test]
@@ -16,13 +16,13 @@ async fn case() -> anyhow::Result<()> {
 
     let creator_code = std::fs::read("./contracts/creator.wasm")?;
 
-    let p_creator = load_project("./contracts/creator.contract")?;
-    let t_creator = ContractMessageTranscoder::new(&p_creator);
+    let c_creator = Contract::new("./contracts/creator.contract")?;
+    let t_creator = &c_creator.transcoder;
 
     let child_code = std::fs::read("./contracts/child.wasm")?;
 
-    let p_child = load_project("./contracts/child.contract")?;
-    let t_child = ContractMessageTranscoder::new(&p_child);
+    let c_child = Contract::new("./contracts/child.contract")?;
+    let t_child = &c_child.transcoder;
 
     let selector = t_creator.encode::<_, String>("new", [])?;
 

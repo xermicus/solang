@@ -26,7 +26,7 @@ async fn mint() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
+            &|t: &ContractMessageTranscoder| {
                 let mut s = t
                     .encode::<_, String>(
                         "transfer",
@@ -49,7 +49,7 @@ async fn mint() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
+            &|t: &ContractMessageTranscoder| {
                 let mut s = t
                     .encode::<_, String>(
                         "transfer",
@@ -77,7 +77,7 @@ async fn mint() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
+            &|t: &ContractMessageTranscoder| {
                 t.encode::<_, String>(
                     "mint",
                     [format!(
@@ -96,7 +96,7 @@ async fn mint() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| t.encode::<_, String>("totalSupply", []).unwrap(),
+            &|t: &ContractMessageTranscoder| t.encode::<_, String>("totalSupply", []).unwrap(),
         )
         .await
         .and_then(|v| <U256>::decode(&mut &v[..]).map_err(Into::into))?;
@@ -109,7 +109,7 @@ async fn mint() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
+            &|t: &ContractMessageTranscoder| {
                 t.encode::<_, String>(
                     "balanceOf",
                     [format!(
@@ -131,7 +131,7 @@ async fn mint() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
+            &|t: &ContractMessageTranscoder| {
                 t.encode::<_, String>(
                     "balanceOf",
                     [format!(
@@ -153,7 +153,7 @@ async fn mint() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
+            &|t: &ContractMessageTranscoder| {
                 t.encode::<_, String>(
                     "balanceOf",
                     [format!(
@@ -172,45 +172,22 @@ async fn mint() -> anyhow::Result<()> {
         U256::from(10_u8).pow(18_u8.into()).mul(U256::from(4_u8))
     );
 
-    let reserves = w
+    let (r0, r1, block) = w
         .pair
         .try_call(
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| t.encode::<_, String>("getReserves", []).unwrap(),
+            &|t: &ContractMessageTranscoder| t.encode::<_, String>("getReserves", []).unwrap(),
         )
-        .await?;
+        .await
+        .and_then(|v| <(u128, u128, u32)>::decode(&mut &v[..]).map_err(Into::into))?;
 
-    let t = ContractMessageTranscoder::new(&w.pair.project);
-
-    let out = t.decode_return("getReserves", &mut &reserves[..])?;
-
-    if let contract_transcode::Value::Map(m) = out {
-        let v0 = m.get_by_str("_reserve0").unwrap();
-
-        let v0_val = match v0 {
-            contract_transcode::Value::UInt(val) => val,
-            _ => unreachable!(),
-        };
-
-        let v1 = m.get_by_str("_reserve1").unwrap();
-        let v1_val = match v1 {
-            contract_transcode::Value::UInt(val) => val,
-            _ => unreachable!(),
-        };
-
-        assert_eq!(
-            U256::from_dec_str(format!("{v0_val}").as_str())?,
-            U256::from(10_u8).pow(18_u8.into())
-        );
-        assert_eq!(
-            U256::from_dec_str(format!("{v1_val}").as_str())?,
-            U256::from(10_u8).pow(18_u8.into()).mul(U256::from(4_u8))
-        );
-    } else {
-        return Err(anyhow::anyhow!("mismatch output type"));
-    }
+    assert_eq!(U256::from(r0), U256::from(10_u8).pow(18_u8.into()));
+    assert_eq!(
+        U256::from(r1),
+        U256::from(10_u8).pow(18_u8.into()).mul(U256::from(4_u8))
+    );
 
     Ok(())
 }
@@ -240,7 +217,7 @@ async fn swap_token0() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
+            &|t: &ContractMessageTranscoder| {
                 let mut s = t
                     .encode::<_, String>(
                         "transfer",
@@ -262,7 +239,7 @@ async fn swap_token0() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
+            &|t: &ContractMessageTranscoder| {
                 let mut s = t.encode::<_, String>("swap", []).unwrap();
 
                 (
@@ -284,48 +261,24 @@ async fn swap_token0() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| t.encode::<_, String>("getReserves", []).unwrap(),
+            &|t: &ContractMessageTranscoder| t.encode::<_, String>("getReserves", []).unwrap(),
         )
         .await
         .and_then(|v| {
-            let t = ContractMessageTranscoder::new(&w.pair.project);
+            let t = &w.pair.transcoder;
 
-            t.decode_return("getReserves", &mut &v[..])
+            <(u128, u128, u32)>::decode(&mut &v[..]).map_err(Into::into)
         })?;
 
-    if let contract_transcode::Value::Map(m) = out {
-        let v0 = m.get_by_str("_reserve0").unwrap();
-
-        let v0_val = match v0 {
-            contract_transcode::Value::UInt(val) => val,
-            _ => unreachable!(),
-        };
-
-        let v1 = m.get_by_str("_reserve1").unwrap();
-        let v1_val = match v1 {
-            contract_transcode::Value::UInt(val) => val,
-            _ => unreachable!(),
-        };
-
-        assert_eq!(
-            U256::from_dec_str(format!("{v0_val}").as_str())?,
-            token0_amount + swap_amount
-        );
-        assert_eq!(
-            U256::from_dec_str(format!("{v1_val}").as_str())?,
-            token1_amount - expected_output
-        );
-    } else {
-        return Err(anyhow::anyhow!("mismatch output type"));
-    }
-
+    assert_eq!(U256::from(out.0), token0_amount + swap_amount);
+    assert_eq!(U256::from(out.1), token1_amount - expected_output);
     let bal_0 = w
         .token_0
         .try_call(
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
+            &|t: &ContractMessageTranscoder| {
                 t.encode::<_, String>(
                     "balanceOf",
                     [format!(
@@ -347,7 +300,7 @@ async fn swap_token0() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
+            &|t: &ContractMessageTranscoder| {
                 t.encode::<_, String>(
                     "balanceOf",
                     [format!(
@@ -368,7 +321,7 @@ async fn swap_token0() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| t.encode::<_, String>("totalSupply", []).unwrap(),
+            &|t: &ContractMessageTranscoder| t.encode::<_, String>("totalSupply", []).unwrap(),
         )
         .await
         .and_then(|v| <U256>::decode(&mut &v[..]).map_err(Into::into))?;
@@ -379,7 +332,7 @@ async fn swap_token0() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| t.encode::<_, String>("totalSupply", []).unwrap(),
+            &|t: &ContractMessageTranscoder| t.encode::<_, String>("totalSupply", []).unwrap(),
         )
         .await
         .and_then(|v| <U256>::decode(&mut &v[..]).map_err(Into::into))?;
@@ -390,7 +343,7 @@ async fn swap_token0() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
+            &|t: &ContractMessageTranscoder| {
                 t.encode::<_, String>(
                     "balanceOf",
                     [format!(
@@ -410,7 +363,7 @@ async fn swap_token0() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
+            &|t: &ContractMessageTranscoder| {
                 t.encode::<_, String>(
                     "balanceOf",
                     [format!(
@@ -455,7 +408,7 @@ async fn swap_token1() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
+            &|t: &ContractMessageTranscoder| {
                 let mut s = t
                     .encode::<_, String>(
                         "transfer",
@@ -477,7 +430,7 @@ async fn swap_token1() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
+            &|t: &ContractMessageTranscoder| {
                 let mut s = t.encode::<_, String>("swap", []).unwrap();
 
                 (
@@ -499,48 +452,20 @@ async fn swap_token1() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| t.encode::<_, String>("getReserves", []).unwrap(),
+            &|t: &ContractMessageTranscoder| t.encode::<_, String>("getReserves", []).unwrap(),
         )
         .await
-        .and_then(|v| {
-            let t = ContractMessageTranscoder::new(&w.pair.project);
+        .and_then(|v| <(u128, u128, u32)>::decode(&mut &v[..]).map_err(Into::into))?;
 
-            t.decode_return("getReserves", &mut &v[..])
-        })?;
-
-    if let contract_transcode::Value::Map(m) = out {
-        let v0 = m.get_by_str("_reserve0").unwrap();
-
-        let v0_val = match v0 {
-            contract_transcode::Value::UInt(val) => val,
-            _ => unreachable!(),
-        };
-
-        let v1 = m.get_by_str("_reserve1").unwrap();
-        let v1_val = match v1 {
-            contract_transcode::Value::UInt(val) => val,
-            _ => unreachable!(),
-        };
-
-        assert_eq!(
-            U256::from_dec_str(format!("{v0_val}").as_str())?,
-            token0_amount - expected_output
-        );
-        assert_eq!(
-            U256::from_dec_str(format!("{v1_val}").as_str())?,
-            token1_amount + swap_amount
-        );
-    } else {
-        return Err(anyhow::anyhow!("mismatch output type"));
-    }
-
+    assert_eq!(U256::from(out.0), token0_amount - expected_output);
+    assert_eq!(U256::from(out.1), token1_amount + swap_amount);
     let bal_0 = w
         .token_0
         .try_call(
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
+            &|t: &ContractMessageTranscoder| {
                 t.encode::<_, String>(
                     "balanceOf",
                     [format!(
@@ -562,7 +487,7 @@ async fn swap_token1() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
+            &|t: &ContractMessageTranscoder| {
                 t.encode::<_, String>(
                     "balanceOf",
                     [format!(
@@ -583,7 +508,7 @@ async fn swap_token1() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| t.encode::<_, String>("totalSupply", []).unwrap(),
+            &|t: &ContractMessageTranscoder| t.encode::<_, String>("totalSupply", []).unwrap(),
         )
         .await
         .and_then(|v| <U256>::decode(&mut &v[..]).map_err(Into::into))?;
@@ -594,7 +519,7 @@ async fn swap_token1() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| t.encode::<_, String>("totalSupply", []).unwrap(),
+            &|t: &ContractMessageTranscoder| t.encode::<_, String>("totalSupply", []).unwrap(),
         )
         .await
         .and_then(|v| <U256>::decode(&mut &v[..]).map_err(Into::into))?;
@@ -605,7 +530,7 @@ async fn swap_token1() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
+            &|t: &ContractMessageTranscoder| {
                 t.encode::<_, String>(
                     "balanceOf",
                     [format!(
@@ -625,7 +550,7 @@ async fn swap_token1() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
+            &|t: &ContractMessageTranscoder| {
                 t.encode::<_, String>(
                     "balanceOf",
                     [format!(
@@ -660,7 +585,7 @@ async fn burn() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
+            &|t: &ContractMessageTranscoder| {
                 let mut s = t
                     .encode::<_, String>(
                         "transfer",
@@ -682,7 +607,7 @@ async fn burn() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
+            &|t: &ContractMessageTranscoder| {
                 t.encode::<_, String>(
                     "burn",
                     [format!(
@@ -701,7 +626,7 @@ async fn burn() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
+            &|t: &ContractMessageTranscoder| {
                 t.encode::<_, String>(
                     "balanceOf",
                     [format!(
@@ -723,7 +648,7 @@ async fn burn() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| t.encode::<_, String>("totalSupply", []).unwrap(),
+            &|t: &ContractMessageTranscoder| t.encode::<_, String>("totalSupply", []).unwrap(),
         )
         .await
         .and_then(|v| <U256>::decode(&mut &v[..]).map_err(Into::into))?;
@@ -736,7 +661,7 @@ async fn burn() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
+            &|t: &ContractMessageTranscoder| {
                 t.encode::<_, String>(
                     "balanceOf",
                     [format!(
@@ -758,7 +683,7 @@ async fn burn() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
+            &|t: &ContractMessageTranscoder| {
                 t.encode::<_, String>(
                     "balanceOf",
                     [format!(
@@ -780,7 +705,7 @@ async fn burn() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| t.encode::<_, String>("totalSupply", []).unwrap(),
+            &|t: &ContractMessageTranscoder| t.encode::<_, String>("totalSupply", []).unwrap(),
         )
         .await
         .and_then(|v| <U256>::decode(&mut &v[..]).map_err(Into::into))?;
@@ -791,7 +716,7 @@ async fn burn() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| t.encode::<_, String>("totalSupply", []).unwrap(),
+            &|t: &ContractMessageTranscoder| t.encode::<_, String>("totalSupply", []).unwrap(),
         )
         .await
         .and_then(|v| <U256>::decode(&mut &v[..]).map_err(Into::into))?;
@@ -802,7 +727,7 @@ async fn burn() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
+            &|t: &ContractMessageTranscoder| {
                 t.encode::<_, String>(
                     "balanceOf",
                     [format!(
@@ -822,7 +747,7 @@ async fn burn() -> anyhow::Result<()> {
             &api,
             sp_keyring::AccountKeyring::Alice,
             0,
-            &|t: ContractMessageTranscoder<'_>| {
+            &|t: &ContractMessageTranscoder| {
                 t.encode::<_, String>(
                     "balanceOf",
                     [format!(
@@ -857,7 +782,7 @@ impl MockWorld {
                 api,
                 sp_keyring::AccountKeyring::Alice,
                 10_u128.pow(16),
-                &|t: ContractMessageTranscoder<'_>| {
+                &|t: &ContractMessageTranscoder| {
                     t.encode::<_, String>(
                         "new",
                         [format!(
@@ -882,7 +807,7 @@ impl MockWorld {
                 api,
                 sp_keyring::AccountKeyring::Alice,
                 0,
-                &|t: ContractMessageTranscoder<'_>| {
+                &|t: &ContractMessageTranscoder| {
                     let mut selector = t.encode::<_, String>("new", []).unwrap();
 
                     U256::from(10_u8).pow(22_u8.into()).encode_to(&mut selector);
@@ -898,7 +823,7 @@ impl MockWorld {
                 api,
                 sp_keyring::AccountKeyring::Alice,
                 0,
-                &|t: ContractMessageTranscoder<'_>| {
+                &|t: &ContractMessageTranscoder| {
                     let mut selector = t.encode::<_, String>("new", []).unwrap();
 
                     U256::from(10_u8).pow(22_u8.into()).encode_to(&mut selector);
@@ -913,7 +838,7 @@ impl MockWorld {
                 api,
                 sp_keyring::AccountKeyring::Alice,
                 0,
-                &|t: ContractMessageTranscoder<'_>| {
+                &|t: &ContractMessageTranscoder| {
                     t.encode::<_, String>(
                         "createPair",
                         [
@@ -931,7 +856,7 @@ impl MockWorld {
                 api,
                 sp_keyring::AccountKeyring::Alice,
                 0,
-                &|t: ContractMessageTranscoder<'_>| {
+                &|t: &ContractMessageTranscoder| {
                     t.encode::<_, String>(
                         "getPair",
                         [
@@ -952,7 +877,7 @@ impl MockWorld {
                 api,
                 sp_keyring::AccountKeyring::Alice,
                 0,
-                &|t: ContractMessageTranscoder<'_>| t.encode::<_, String>("token0", []).unwrap(),
+                &|t: &ContractMessageTranscoder| t.encode::<_, String>("token0", []).unwrap(),
             )
             .await
             .and_then(|v| <AccountId32>::decode(&mut &v[..]).map_err(Into::into))?;
@@ -982,7 +907,7 @@ impl MockWorld {
                 api,
                 sp_keyring::AccountKeyring::Alice,
                 0,
-                &|t: ContractMessageTranscoder<'_>| {
+                &|t: &ContractMessageTranscoder| {
                     let mut s = t
                         .encode(
                             "transfer",
@@ -1004,7 +929,7 @@ impl MockWorld {
                 api,
                 sp_keyring::AccountKeyring::Alice,
                 0,
-                &|t: ContractMessageTranscoder<'_>| {
+                &|t: &ContractMessageTranscoder| {
                     let mut s = t
                         .encode(
                             "transfer",
@@ -1026,7 +951,7 @@ impl MockWorld {
                 api,
                 sp_keyring::AccountKeyring::Alice,
                 0,
-                &|t: ContractMessageTranscoder<'_>| {
+                &|t: &ContractMessageTranscoder| {
                     t.encode(
                         "mint",
                         [format!(

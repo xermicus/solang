@@ -4,7 +4,7 @@ use parity_scale_codec::{Decode, DecodeAll, Encode};
 use rand::Rng;
 use sp_core::{hexdisplay::AsBytesRef, keccak_256, U256};
 
-use crate::{load_project, DeployContract, Execution, ReadContract, WriteContract, API};
+use crate::{load_project, Contract, DeployContract, Execution, ReadContract, WriteContract, API};
 
 #[tokio::test]
 async fn case() -> anyhow::Result<()> {
@@ -12,9 +12,9 @@ async fn case() -> anyhow::Result<()> {
 
     let code = std::fs::read("./contracts/store.wasm")?;
 
-    let p = load_project("./contracts/store.contract")?;
+    let c = Contract::new("./contracts/store.contract")?;
 
-    let transcoder = ContractMessageTranscoder::new(&p);
+    let transcoder = &c.transcoder;
 
     let selector = transcoder.encode::<_, String>("new", [])?;
 

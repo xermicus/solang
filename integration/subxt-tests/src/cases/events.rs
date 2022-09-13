@@ -2,7 +2,7 @@ use contract_transcode::ContractMessageTranscoder;
 use parity_scale_codec::{Compact, Decode, Input};
 use sp_core::{crypto::AccountId32, hexdisplay::AsBytesRef};
 
-use crate::{load_project, DeployContract, Execution, WriteContract, API};
+use crate::{load_project, Contract, DeployContract, Execution, WriteContract, API};
 use hex::FromHex;
 
 #[tokio::test]
@@ -10,8 +10,9 @@ async fn case() -> anyhow::Result<()> {
     let api = API::new().await?;
     let code = std::fs::read("./contracts/events.wasm")?;
 
-    let p = load_project("./contracts/events.contract")?;
-    let transcoder = ContractMessageTranscoder::new(&p);
+    let c = Contract::new("./contracts/events.contract")?;
+
+    let transcoder = &c.transcoder;
 
     let selector = transcoder.encode::<_, String>("new", [])?;
 

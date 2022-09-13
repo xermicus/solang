@@ -1,7 +1,7 @@
 use contract_transcode::ContractMessageTranscoder;
 use parity_scale_codec::Encode;
 
-use crate::{load_project, DeployContract, Execution, WriteContract, API};
+use crate::{load_project, Contract, DeployContract, Execution, WriteContract, API};
 
 #[tokio::test]
 async fn case() -> anyhow::Result<()> {
@@ -10,11 +10,11 @@ async fn case() -> anyhow::Result<()> {
     let flipper_code = std::fs::read("./contracts/Flip.wasm")?;
     let inc_code = std::fs::read("./contracts/Inc.wasm")?;
 
-    let p_flipper = load_project("./contracts/Flip.contract")?;
-    let t_flipper = ContractMessageTranscoder::new(&p_flipper);
+    let c_flipper = Contract::new("contracts/Flip.contract")?;
+    let t_flipper = &c_flipper.transcoder;
 
-    let p_inc = load_project("./contracts/Inc.contract")?;
-    let t_inc = ContractMessageTranscoder::new(&p_inc);
+    let c_inc = Contract::new("./contracts/Inc.contract")?;
+    let t_inc = &c_inc.transcoder;
 
     let selector = t_flipper.encode::<_, String>("new", ["true".into()])?;
 

@@ -3,7 +3,8 @@ use parity_scale_codec::{Decode, Encode};
 use sp_core::hexdisplay::AsBytesRef;
 
 use crate::{
-    free_balance_of, load_project, DeployContract, Execution, ReadContract, WriteContract, API,
+    free_balance_of, load_project, Contract, DeployContract, Execution, ReadContract,
+    WriteContract, API,
 };
 
 #[tokio::test]
@@ -11,8 +12,9 @@ async fn case() -> anyhow::Result<()> {
     let api = API::new().await?;
     let code = std::fs::read("./contracts/destruct.wasm")?;
 
-    let p = load_project("./contracts/destruct.contract")?;
-    let transcoder = ContractMessageTranscoder::new(&p);
+    let c = Contract::new("./contracts/destruct.contract")?;
+
+    let transcoder = &c.transcoder;
 
     let selector = transcoder.encode::<_, String>("new", [])?;
 
