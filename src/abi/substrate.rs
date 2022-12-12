@@ -49,6 +49,7 @@ fn primitive_to_ty(ty: &ast::Type, registry: &mut PortableRegistryBuilder) -> u3
         )),
         _ => unreachable!("non primitive types"),
     }
+}
 
 fn int_to_ty(ty: &ast::Type, registry: &mut PortableRegistryBuilder) -> u32 {
     let (signed, scalety) = match ty {
