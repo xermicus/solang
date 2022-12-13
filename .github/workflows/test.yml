@@ -332,7 +332,7 @@ jobs:
       # We can't run substrate as a github actions service, since it requires
       # command line arguments. See https://github.com/actions/runner/pull/1152
     - name: Start substrate
-      run: docker run -d -p 9944:9944 paritytech/contracts-ci-linux:production substrate-contracts-node --dev --ws-external
+      run: docker run -d -p 9944:9944 paritytech/contracts-ci-linux substrate-contracts-node --dev --ws-external
     - uses: actions/download-artifact@master
       with:
         name: solang-linux-x86-64
@@ -340,15 +340,9 @@ jobs:
     - run: |
         chmod 755 ./bin/solang
         echo "$(pwd)/bin" >> $GITHUB_PATH
-    - name: Install latest rust toolchain
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        default: true
-        override: true   
-    - run: solang compile --target substrate ../substrate/*.sol -o ./contracts/
-      working-directory: ./integration/subxt-tests
-    - run: solang compile --target substrate ../substrate/test/*.sol -o ./contracts/
+    - name: Install rust toolchain
+    - uses: dtolnay/rust-toolchain@1.63.0
+    - run: "parallel solang compile --target substrate -o ./contracts ::: ../substrate/*.sol ../substrate/test/*.sol"
       working-directory: ./integration/subxt-tests
     - name: Deploy and test contracts
       run: cargo test -- --test-threads=1
