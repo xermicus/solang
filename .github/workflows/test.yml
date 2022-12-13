@@ -341,7 +341,7 @@ jobs:
         chmod 755 ./bin/solang
         echo "$(pwd)/bin" >> $GITHUB_PATH
     - name: Install rust toolchain
-    - uses: dtolnay/rust-toolchain@1.63.0
+      uses: dtolnay/rust-toolchain@1.63.0
     - run: "parallel solang compile --target substrate -o ./contracts ::: ../substrate/*.sol ../substrate/test/*.sol"
       working-directory: ./integration/subxt-tests
     - name: Deploy and test contracts
