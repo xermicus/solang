@@ -111,12 +111,12 @@ void *__attribute__((noinline)) __malloc(uint32_t size)
     else
     {
         // go bang
-//#ifdef __wasm__
+#if defined(__wasm__) || defined(__riscv)
         __builtin_unreachable();
-//#else
-//        sol_log("out of heap memory");
-//        sol_panic();
-//#endif
+#else
+        sol_log("out of heap memory");
+        sol_panic();
+#endif
         return NULL;
     }
 }

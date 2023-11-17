@@ -319,20 +319,23 @@ impl<'a> Binary<'a> {
         LLVM_INIT.get_or_init(|| {
             inkwell::targets::Target::initialize_webassembly(&Default::default());
 
-            extern "C" {
-                fn LLVMInitializeSBFTarget();
-                fn LLVMInitializeSBFTargetInfo();
-                fn LLVMInitializeSBFAsmPrinter();
-                fn LLVMInitializeSBFDisassembler();
-                fn LLVMInitializeSBFTargetMC();
-            }
+            #[cfg(feature = "solana")]
+            {
+                extern "C" {
+                    fn LLVMInitializeSBFTarget();
+                    fn LLVMInitializeSBFTargetInfo();
+                    fn LLVMInitializeSBFAsmPrinter();
+                    fn LLVMInitializeSBFDisassembler();
+                    fn LLVMInitializeSBFTargetMC();
+                }
 
-            unsafe {
-                LLVMInitializeSBFTarget();
-                LLVMInitializeSBFTargetInfo();
-                LLVMInitializeSBFAsmPrinter();
-                LLVMInitializeSBFDisassembler();
-                LLVMInitializeSBFTargetMC();
+                unsafe {
+                    LLVMInitializeSBFTarget();
+                    LLVMInitializeSBFTargetInfo();
+                    LLVMInitializeSBFAsmPrinter();
+                    LLVMInitializeSBFDisassembler();
+                    LLVMInitializeSBFTargetMC();
+                }
             }
         });
 
@@ -1203,6 +1206,7 @@ impl<'a> Binary<'a> {
 /// Return the stdlib as parsed llvm module. The solidity standard library is hardcoded into
 /// the solang library
 fn load_stdlib<'a>(context: &'a Context, target: &Target) -> Module<'a> {
+    #[cfg(feature = "solana")]
     if *target == Target::Solana {
         let memory = MemoryBuffer::create_from_memory_range(BPF_IR[0], "bpf_bc");
 
@@ -1243,6 +1247,7 @@ fn load_stdlib<'a>(context: &'a Context, target: &Target) -> Module<'a> {
     module
 }
 
+#[cfg(feature = "solana")]
 static BPF_IR: [&[u8]; 6] = [
     include_bytes!("../../target/bpf/stdlib.bc"),
     include_bytes!("../../target/bpf/bigint.bc"),

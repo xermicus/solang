@@ -103,6 +103,7 @@ default = ["llvm", "wasm_opt", "language_server"]
 llvm = ["inkwell", "libc"]
 wasm_opt = ["llvm", "wasm-opt", "contract-build"]
 language_server = ["tower-lsp", "forge-fmt", "ethers-core", "tokio", "rust-lapper"]
+solana = []
 
 [workspace]
 members = ["solang-parser", "tests/wasm_host_attr"]

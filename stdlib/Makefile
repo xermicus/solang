@@ -17,6 +17,7 @@ RISCV=$(addprefix ../target/riscv/,ripemd160.bc stdlib.bc bigint.bc format.bc he
 
 all: $(SOLANA) $(WASM)
 riscv: $(RISCV)
+Wasm: $(WASM)
 
 $(SOLANA) $(WASM) $(RISCV): | outputs_dirs
 

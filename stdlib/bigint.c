@@ -3,8 +3,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#ifdef __riscv
 typedef unsigned _BitInt(128) __uint128_t;
 typedef signed _BitInt(128) __int128_t;
+#endif
 
 /*
     In wasm/bpf, the instruction for multiplying two 64 bit values results in a 64 bit value. In

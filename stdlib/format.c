@@ -2,8 +2,10 @@
 
 #include <stdint.h>
 
+#ifdef __riscv
 typedef unsigned _BitInt(128) __uint128_t;
 typedef signed _BitInt(128) __int128_t;
+#endif
 
 void hex_encode(char *output, uint8_t *input, uint32_t length)
 {
