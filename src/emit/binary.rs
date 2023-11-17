@@ -318,6 +318,7 @@ impl<'a> Binary<'a> {
     ) -> Self {
         LLVM_INIT.get_or_init(|| {
             inkwell::targets::Target::initialize_webassembly(&Default::default());
+            inkwell::targets::Target::initialize_riscv(&Default::default());
 
             #[cfg(feature = "solana")]
             {
@@ -1206,6 +1207,25 @@ impl<'a> Binary<'a> {
 /// Return the stdlib as parsed llvm module. The solidity standard library is hardcoded into
 /// the solang library
 fn load_stdlib<'a>(context: &'a Context, target: &Target) -> Module<'a> {
+    //let memory = MemoryBuffer::create_from_memory_range(RISCV_IR[0], "riscv_bc");
+
+    //let module = Module::parse_bitcode_from_buffer(&memory, context).unwrap();
+
+    //for bc in RISCV_IR.iter().skip(1) {
+    //    let memory = MemoryBuffer::create_from_memory_range(bc, "riscv_bc");
+
+    //    module
+    //        .link_in_module(Module::parse_bitcode_from_buffer(&memory, context).unwrap())
+    //        .unwrap();
+    //}
+
+    //let memory = MemoryBuffer::create_from_memory_range(WASM_RIPEMD160_IR, "ripemd160");
+    //module
+    //    .link_in_module(Module::parse_bitcode_from_buffer(&memory, context).unwrap())
+    //    .unwrap();
+
+    //return module;
+
     #[cfg(feature = "solana")]
     if *target == Target::Solana {
         let memory = MemoryBuffer::create_from_memory_range(BPF_IR[0], "bpf_bc");
@@ -1223,11 +1243,11 @@ fn load_stdlib<'a>(context: &'a Context, target: &Target) -> Module<'a> {
         return module;
     }
 
-    let memory = MemoryBuffer::create_from_memory_range(WASM_IR[0], "wasm_bc");
+    let memory = MemoryBuffer::create_from_memory_range(RISCV_IR[0], "wasm_bc");
 
     let module = Module::parse_bitcode_from_buffer(&memory, context).unwrap();
 
-    for bc in WASM_IR.iter().skip(1) {
+    for bc in RISCV_IR.iter().skip(1) {
         let memory = MemoryBuffer::create_from_memory_range(bc, "wasm_bc");
 
         module
@@ -1237,7 +1257,7 @@ fn load_stdlib<'a>(context: &'a Context, target: &Target) -> Module<'a> {
 
     if let Target::Polkadot { .. } = *target {
         // contracts pallet does not provide ripemd160
-        let memory = MemoryBuffer::create_from_memory_range(RIPEMD160_IR, "ripemd160");
+        let memory = MemoryBuffer::create_from_memory_range(RISCV_RIPEMD160_IR, "ripemd160");
 
         module
             .link_in_module(Module::parse_bitcode_from_buffer(&memory, context).unwrap())
@@ -1264,4 +1284,12 @@ static WASM_IR: [&[u8]; 4] = [
     include_bytes!("../../target/wasm/format.bc"),
 ];
 
-static RIPEMD160_IR: &[u8] = include_bytes!("../../target/wasm/ripemd160.bc");
+static RISCV_IR: [&[u8]; 4] = [
+    include_bytes!("../../target/riscv/stdlib.bc"),
+    include_bytes!("../../target/riscv/heap.bc"),
+    include_bytes!("../../target/riscv/bigint.bc"),
+    include_bytes!("../../target/riscv/format.bc"),
+];
+
+static WASM_RIPEMD160_IR: &[u8] = include_bytes!("../../target/wasm/ripemd160.bc");
+static RISCV_RIPEMD160_IR: &[u8] = include_bytes!("../../target/wasm/ripemd160.bc");

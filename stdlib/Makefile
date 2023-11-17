@@ -31,7 +31,7 @@ outputs_dirs:
 	@mkdir -p ../target/bpf ../target/wasm ../target/riscv
 
 clean:
-	rm -rf ../target/bpf ../target/wasm
+	rm -rf ../target/bpf ../target/wasm ../target/riscv
 
 test:
 	clang -DTEST -DSOL_TEST -O3 -Wall solana.c stdlib.c -o test

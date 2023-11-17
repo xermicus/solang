@@ -335,7 +335,7 @@ impl Target {
         if *self == Target::Solana {
             "sbf"
         } else {
-            "wasm32"
+            "riscv32"
         }
     }
 
@@ -344,7 +344,7 @@ impl Target {
         TargetTriple::create(if *self == Target::Solana {
             "sbf-unknown-unknown"
         } else {
-            "wasm32-unknown-unknown-wasm"
+            "riscv32em-unknown-none-elf"
         })
     }
 
