@@ -1,4 +1,4 @@
-CC=clang
+CC=/opt/clang-rv32e/bin/clang
 BIT_INT_FLAGS=-Xclang -fexperimental-max-bitint-width=512
 CFLAGS=$(TARGET_FLAGS) -emit-llvm -O3 -ffreestanding -fno-builtin -Wall -Wno-unused-function $(BIT_INT_FLAGS)
 
@@ -8,20 +8,26 @@ CFLAGS=$(TARGET_FLAGS) -emit-llvm -O3 -ffreestanding -fno-builtin -Wall -Wno-unu
 ../target/wasm/%.bc: %.c
 	$(CC) -c $(CFLAGS) $< -o $@
 
+../target/riscv/%.bc: %.c
+	$(CC) -c $(CFLAGS) $< -o $@
+
 SOLANA=$(addprefix ../target/bpf/,solana.bc bigint.bc format.bc stdlib.bc ripemd160.bc heap.bc)
 WASM=$(addprefix ../target/wasm/,ripemd160.bc stdlib.bc bigint.bc format.bc heap.bc)
+RISCV=$(addprefix ../target/riscv/,ripemd160.bc stdlib.bc bigint.bc format.bc heap.bc)
 
 all: $(SOLANA) $(WASM)
+riscv: $(RISCV)
 
-$(SOLANA) $(WASM): | outputs_dirs
+$(SOLANA) $(WASM) $(RISCV): | outputs_dirs
 
 $(SOLANA): TARGET_FLAGS=--target=sbf
 $(WASM): TARGET_FLAGS=--target=wasm32
+$(RISCV): TARGET_FLAGS=--target=riscv32 -march=rv32em
 
 bpf/solana.bc: solana.c solana_sdk.h | outputs_dirs
 
 outputs_dirs:
-	@mkdir -p ../target/bpf ../target/wasm
+	@mkdir -p ../target/bpf ../target/wasm ../target/riscv
 
 clean:
 	rm -rf ../target/bpf ../target/wasm

@@ -6,7 +6,7 @@
 #include "stdlib.h"
 
 #ifndef __wasm__
-#include "solana_sdk.h"
+//#include "solana_sdk.h"
 #endif
 
 /*
@@ -111,12 +111,12 @@ void *__attribute__((noinline)) __malloc(uint32_t size)
     else
     {
         // go bang
-#ifdef __wasm__
+//#ifdef __wasm__
         __builtin_unreachable();
-#else
-        sol_log("out of heap memory");
-        sol_panic();
-#endif
+//#else
+//        sol_log("out of heap memory");
+//        sol_panic();
+//#endif
         return NULL;
     }
 }

@@ -6,7 +6,7 @@ fn main() {
     #[cfg(feature = "llvm")]
     {
         Command::new("make")
-            .args(["-C", "stdlib"])
+            .args(["-C", "stdlib riscv"])
             .output()
             .expect("Could not build stdlib");
 

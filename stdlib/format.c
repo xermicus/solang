@@ -2,6 +2,9 @@
 
 #include <stdint.h>
 
+typedef unsigned _BitInt(128) __uint128_t;
+typedef signed _BitInt(128) __int128_t;
+
 void hex_encode(char *output, uint8_t *input, uint32_t length)
 {
     for (int i = 0; i < length; i++)
