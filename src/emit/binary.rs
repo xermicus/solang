@@ -208,7 +208,7 @@ impl<'a> Binary<'a> {
         let target_machine = target
             .create_target_machine(
                 &self.target.llvm_target_triple(),
-                "",
+                "generic-rv32",
                 self.target.llvm_features(),
                 self.options.opt_level.into(),
                 RelocMode::Default,
@@ -317,7 +317,7 @@ impl<'a> Binary<'a> {
         runtime: Option<Box<Binary<'a>>>,
     ) -> Self {
         LLVM_INIT.get_or_init(|| {
-            inkwell::targets::Target::initialize_webassembly(&Default::default());
+            //inkwell::targets::Target::initialize_webassembly(&Default::default());
             inkwell::targets::Target::initialize_riscv(&Default::default());
 
             #[cfg(feature = "solana")]

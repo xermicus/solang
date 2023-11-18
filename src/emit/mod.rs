@@ -344,7 +344,7 @@ impl Target {
         TargetTriple::create(if *self == Target::Solana {
             "sbf-unknown-unknown"
         } else {
-            "riscv32em-unknown-none-elf"
+            "riscv32-unknown-none-elf"
         })
     }
 
@@ -353,7 +353,7 @@ impl Target {
         if *self == Target::Solana {
             "+solana"
         } else {
-            ""
+            "+e,+m"
         }
     }
 }
