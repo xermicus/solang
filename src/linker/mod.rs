@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod bpf;
+mod rv;
 mod wasm;
 
 use crate::Target;
@@ -16,12 +17,12 @@ pub fn link(input: &[u8], name: &str, target: Target) -> Vec<u8> {
     // We should fix this one day
     let _lock = LINKER_MUTEX.lock().unwrap();
 
-    //if target == Target::Solana {
-    //    bpf::link(input, name)
-    //} else {
-    //    wasm::link(input, name)
-    //}
-    bpf::link(input, name)
+    if target == Target::Solana {
+        bpf::link(input, name)
+    } else {
+        //wasm::link(input, name)
+        rv::link(input, name)
+    }
 }
 
 extern "C" {

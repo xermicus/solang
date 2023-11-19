@@ -211,7 +211,7 @@ impl<'a> Binary<'a> {
                 "generic-rv32",
                 self.target.llvm_features(),
                 self.options.opt_level.into(),
-                RelocMode::Default,
+                RelocMode::Static,
                 CodeModel::Default,
             )
             .unwrap();
@@ -267,9 +267,9 @@ impl<'a> Binary<'a> {
         // so eliminating them now will cause link errors. Either we should prevent these
         // calls from being done in the first place or do dce at link time
         let mut export_list = export_list.to_vec();
-        export_list.push("__ashlti3");
-        export_list.push("__lshrti3");
-        export_list.push("__ashrti3");
+        //export_list.push("__ashlti3");
+        //export_list.push("__lshrti3");
+        //export_list.push("__ashrti3");
 
         while let Some(f) = func {
             let name = f.get_name().to_str().unwrap();
@@ -1255,14 +1255,14 @@ fn load_stdlib<'a>(context: &'a Context, target: &Target) -> Module<'a> {
             .unwrap();
     }
 
-    if let Target::Polkadot { .. } = *target {
-        // contracts pallet does not provide ripemd160
-        let memory = MemoryBuffer::create_from_memory_range(RISCV_RIPEMD160_IR, "ripemd160");
+    //if let Target::Polkadot { .. } = *target {
+    //    // contracts pallet does not provide ripemd160
+    //    let memory = MemoryBuffer::create_from_memory_range(RISCV_RIPEMD160_IR, "ripemd160");
 
-        module
-            .link_in_module(Module::parse_bitcode_from_buffer(&memory, context).unwrap())
-            .unwrap();
-    }
+    //    module
+    //        .link_in_module(Module::parse_bitcode_from_buffer(&memory, context).unwrap())
+    //        .unwrap();
+    //}
 
     module
 }
