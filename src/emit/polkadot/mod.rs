@@ -90,7 +90,7 @@ impl PolkadotTarget {
             "deploy",
             "call",
             "call_chain_extension",
-            "__polkavm_import_input",
+            "input",
             "set_storage",
             "get_storage",
             "clear_storage",
@@ -98,13 +98,13 @@ impl PolkadotTarget {
             "hash_sha2_256",
             "hash_blake2_128",
             "hash_blake2_256",
-            "__polkavm_import_seal_return",
+            "seal_return",
             "debug_message",
             "instantiate",
             "seal_call",
             "delegate_call",
             "code_hash",
-            "__polkavm_import_value_transferred",
+            "value_transferred",
             "minimum_balance",
             "weight_to_fee",
             "instantiation_nonce",
@@ -157,10 +157,7 @@ impl PolkadotTarget {
         );
 
         binary.builder.build_call(
-            binary
-                .module
-                .get_function("__polkavm_import_input")
-                .unwrap(),
+            binary.module.get_function("input").unwrap(),
             &[scratch_buf.into(), scratch_len.into()],
             "",
         );
@@ -191,7 +188,8 @@ impl PolkadotTarget {
                 binary.module.add_function(
                     $name,
                     ctx.$fn_type().fn_type(&[$($args),*], false),
-                    Some(Linkage::Internal),
+                    //Some(Linkage::External),
+                    None,
                 );
             };
         }
@@ -205,7 +203,7 @@ impl PolkadotTarget {
             u8_ptr,
             u32_ptr
         );
-        external!("__polkavm_import_input", void_type, u8_ptr, u32_ptr);
+        external!("input", void_type, u8_ptr, u32_ptr);
         external!("hash_keccak_256", void_type, u8_ptr, u32_val, u8_ptr);
         external!("hash_sha2_256", void_type, u8_ptr, u32_val, u8_ptr);
         external!("hash_blake2_128", void_type, u8_ptr, u32_val, u8_ptr);
@@ -215,13 +213,7 @@ impl PolkadotTarget {
         external!("debug_message", i32_type, u8_ptr, u32_val);
         external!("clear_storage", i32_type, u8_ptr, u32_val);
         external!("get_storage", i32_type, u8_ptr, u32_val, u8_ptr, u32_ptr);
-        external!(
-            "__polkavm_import_seal_return",
-            void_type,
-            u32_val,
-            u8_ptr,
-            u32_val
-        );
+        external!("seal_return", void_type, u32_val, u8_ptr, u32_val);
         external!(
             "instantiate",
             i32_type,
@@ -263,12 +255,7 @@ impl PolkadotTarget {
         );
         external!("code_hash", i32_type, u8_ptr, u8_ptr, u32_ptr);
         external!("transfer", i32_type, u8_ptr, u32_val, u8_ptr, u32_val);
-        external!(
-            "__polkavm_import_value_transferred",
-            void_type,
-            u8_ptr,
-            u32_ptr
-        );
+        external!("value_transferred", void_type, u8_ptr, u32_ptr);
         external!("address", void_type, u8_ptr, u32_ptr);
         external!("balance", void_type, u8_ptr, u32_ptr);
         external!("minimum_balance", void_type, u8_ptr, u32_ptr);
@@ -311,6 +298,7 @@ impl PolkadotTarget {
         let cfg = bin.module.get_function(dispatch_cfg_name).unwrap();
         cfg.set_linkage(Linkage::External);
         bin.builder.build_call(cfg, &args, dispatch_cfg_name);
+        bin.builder.build_return(None);
 
         bin.builder.build_unreachable();
     }

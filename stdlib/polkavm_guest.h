@@ -124,7 +124,7 @@
     POLKAVM_ARG_TY(__VA_ARGS__)
 
 #define POLKAVM_EXPORT(arg_return_ty, fn_name, ...) \
-static void __attribute__ ((naked, used)) POLKAVM_UNIQUE(polkavm_export_dummy)() { \
+void __attribute__ ((naked, used)) POLKAVM_UNIQUE(polkavm_export_dummy)() { \
     __asm__( \
         ".pushsection .polkavm_exports,\"\",@progbits\n" \
         ".byte 1\n" \
@@ -139,15 +139,14 @@ static void __attribute__ ((naked, used)) POLKAVM_UNIQUE(polkavm_export_dummy)()
     ); \
 }
 
-#define POLKAVM_IMPORT(arg_return_ty, fn_name, index, ...) \
+#define POLKAVM_IMPORT(arg_return_ty, fn_name, ...) \
 static void __attribute__ ((naked, used)) POLKAVM_UNIQUE(polkavm_import_dummy)() { \
     __asm__( \
         ".pushsection .polkavm_imports." #fn_name ",\"a\",@progbits\n" \
         ".hidden __polkavm_import_" #fn_name "\n" \
         "__polkavm_import_" #fn_name ":\n" \
         ".byte 1\n" \
-        ".byte 1\n" \
-        ".4byte 0x" #index "\n" \
+        ".byte 0\n" \
         POLKAVM_IMPORT_EXPORT_ASM_IMPL(fn_name, ## __VA_ARGS__) \
         ".popsection\n" \
         : \
@@ -157,7 +156,7 @@ static void __attribute__ ((naked, used)) POLKAVM_UNIQUE(polkavm_import_dummy)()
         : \
     ); \
 } \
-static arg_return_ty __attribute__ ((naked)) fn_name(POLKAVM_IMPORT_ARGS_IMPL(__VA_ARGS__)) { \
+arg_return_ty __attribute__ ((naked)) fn_name(POLKAVM_IMPORT_ARGS_IMPL(__VA_ARGS__)) { \
     __asm__( \
         ".word 0x0000000b\n" \
         ".word __polkavm_import_" #fn_name "\n" \

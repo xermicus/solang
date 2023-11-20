@@ -198,8 +198,12 @@ struct vector *vector_new(uint32_t members, uint32_t size, uint8_t *initial)
 #ifdef __riscv
 #include "polkavm_guest.h"
 
-POLKAVM_IMPORT(void, seal_return, 0000000d, size_t, size_t);
-POLKAVM_IMPORT(void, input, 0000000e, size_t, size_t);
-POLKAVM_IMPORT(void, value_transferred, 0000001b, size_t, size_t);
+POLKAVM_IMPORT(void, seal_return, size_t, size_t);
+POLKAVM_IMPORT(void, input, size_t, size_t);
+POLKAVM_IMPORT(void, value_transferred, size_t, size_t);
+
+extern void __solang_trap() {
+    POLKAVM_TRAP();
+}
 
 #endif

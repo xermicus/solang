@@ -763,7 +763,7 @@ impl<'a> TargetRuntime<'a> for PolkadotTarget {
         emit_context!(binary);
 
         call!(
-            "__polkavm_import_seal_return",
+            "seal_return",
             &[i32_zero!().into(), data.into(), data_len.into()]
         );
 
@@ -774,10 +774,7 @@ impl<'a> TargetRuntime<'a> for PolkadotTarget {
         emit_context!(binary);
 
         let flags = i32_const!(1).into(); // First bit set means revert
-        call!(
-            "__polkavm_import_seal_return",
-            &[flags, data.into(), length.into()]
-        );
+        call!("seal_return", &[flags, data.into(), length.into()]);
 
         // Inserting an "unreachable" instruction signals to the LLVM optimizer
         // that any following code can not be reached.
@@ -1098,7 +1095,7 @@ impl<'a> TargetRuntime<'a> for PolkadotTarget {
             .build_store(value_len, i32_const!(ns.value_length as u64));
 
         call!(
-            "__polkavm_import_value_transferred",
+            "value_transferred",
             &[value.into(), value_len.into()],
             "value_transferred"
         );
