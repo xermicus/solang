@@ -211,7 +211,7 @@ impl<'a> Binary<'a> {
                 "generic-rv32",
                 self.target.llvm_features(),
                 self.options.opt_level.into(),
-                RelocMode::Static,
+                RelocMode::PIC,
                 CodeModel::Default,
             )
             .unwrap();
@@ -342,6 +342,19 @@ impl<'a> Binary<'a> {
 
         let triple = target.llvm_target_triple();
         let module = context.create_module(name);
+
+        let pie_large = context.i32_type().const_int(2, false);
+        let pic_big = context.i32_type().const_int(2, false);
+        module.add_basic_value_flag(
+            "PIE Level",
+            inkwell::module::FlagBehavior::Override,
+            pie_large,
+        );
+        module.add_basic_value_flag(
+            "PIC Level",
+            inkwell::module::FlagBehavior::Override,
+            pic_big,
+        );
 
         let debug_metadata_version = context.i32_type().const_int(3, false);
         module.add_basic_value_flag(

@@ -30,8 +30,6 @@ SECTIONS {
     . = 0x10000;
     .rodata : { *(.rodata) *(.rodata.*) }
     .data.rel.ro : { *(.data.rel.ro) *(.data.rel.ro.*) }
-    .bss.rel.ro : { *(.bss.rel.ro) *(.bss.rel.ro.*) }
-    .rodata.rel.ro : { *(.rodata.rel.ro) *(.rodata.rel.ro.*) }
     .got : { *(.got) *(.got.*) }
 
     . = ALIGN(0x4000);
@@ -49,15 +47,10 @@ SECTIONS {
         .expect("failed to write linker script to temp file");
 
     let command_line = vec![
-        CString::new("-z").unwrap(),
-        CString::new("notext").unwrap(),
         CString::new("--error-limit=0").unwrap(),
         CString::new("--relocatable").unwrap(),
         CString::new("--emit-relocs").unwrap(),
         CString::new("--no-relax").unwrap(),
-        //CString::new("--shared").unwrap(),
-        //CString::new("--gc-sections").unwrap(),
-        //CString::new("--Bdynamic").unwrap(),
         CString::new(
             linker_script_filename
                 .to_str()

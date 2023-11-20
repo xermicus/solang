@@ -191,7 +191,7 @@ impl PolkadotTarget {
                 binary.module.add_function(
                     $name,
                     ctx.$fn_type().fn_type(&[$($args),*], false),
-                    None,
+                    Some(Linkage::Internal),
                 );
             };
         }
@@ -309,6 +309,7 @@ impl PolkadotTarget {
             .unwrap_or(DispatchType::Call)
             .to_string();
         let cfg = bin.module.get_function(dispatch_cfg_name).unwrap();
+        cfg.set_linkage(Linkage::External);
         bin.builder.build_call(cfg, &args, dispatch_cfg_name);
 
         bin.builder.build_unreachable();
