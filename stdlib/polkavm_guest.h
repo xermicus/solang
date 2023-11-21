@@ -139,14 +139,15 @@ void __attribute__ ((naked, used)) POLKAVM_UNIQUE(polkavm_export_dummy)() { \
     ); \
 }
 
-#define POLKAVM_IMPORT(arg_return_ty, fn_name, ...) \
+#define POLKAVM_IMPORT(arg_return_ty, fn_name, index, ...) \
 static void __attribute__ ((naked, used)) POLKAVM_UNIQUE(polkavm_import_dummy)() { \
     __asm__( \
         ".pushsection .polkavm_imports." #fn_name ",\"a\",@progbits\n" \
         ".hidden __polkavm_import_" #fn_name "\n" \
         "__polkavm_import_" #fn_name ":\n" \
         ".byte 1\n" \
-        ".byte 0\n" \
+        ".byte 1\n" \
+        ".4byte " #index "\n"\
         POLKAVM_IMPORT_EXPORT_ASM_IMPL(fn_name, ## __VA_ARGS__) \
         ".popsection\n" \
         : \
