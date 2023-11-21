@@ -10,6 +10,7 @@ use std::str;
 
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
+use polkavm_common::elf::FnMetadata;
 use std::collections::HashMap;
 #[cfg(feature = "wasm_opt")]
 use tempfile::tempdir;
@@ -386,6 +387,9 @@ impl<'a> Binary<'a> {
         module.set_source_file_name(filename);
 
         module.link_in_module(std_lib.clone()).unwrap();
+        let (pvm_call, pvm_deploy) = pvm_exports(&context);
+        module.link_in_module(pvm_call.clone()).unwrap();
+        module.link_in_module(pvm_deploy.clone()).unwrap();
 
         let selector = module.add_global(
             context.i32_type(),
@@ -1306,3 +1310,47 @@ static RISCV_IR: [&[u8]; 4] = [
 
 static WASM_RIPEMD160_IR: &[u8] = include_bytes!("../../target/wasm/ripemd160.bc");
 static RISCV_RIPEMD160_IR: &[u8] = include_bytes!("../../target/wasm/ripemd160.bc");
+
+pub(super) fn pvm_exports<'a>(ctx: &'a Context) -> (Module<'a>, Module<'a>) {
+    let call_m = ctx.create_module("pvm_call");
+    let deploy_m = ctx.create_module("pvm_deploy");
+
+    call_m.set_inline_assembly(&generate_export_assembly("call", [0, 0, 0, 0]));
+    deploy_m.set_inline_assembly(&generate_export_assembly("deploy", [0, 0, 0, 0]));
+
+    (call_m, deploy_m)
+}
+
+fn generate_export_assembly(symbol: &str, addres: [u8; 4]) -> String {
+    let mut assembly = String::new();
+
+    assembly.push_str(".pushsection .polkavm_exports,\"\",@progbits\n");
+    assembly.push_str(".byte 1\n"); // Version.
+    assembly.push_str(&format!(".4byte {symbol}\n")); // Address
+
+    // Metadata
+    let mut metadata = Vec::new();
+    FnMetadata {
+        name: symbol.to_string(),
+        args: Default::default(),
+        return_ty: Default::default(),
+    }
+    .serialize(|slice| metadata.extend_from_slice(slice));
+
+    assembly.push_str(&bytes_to_asm(&metadata));
+
+    assembly.push_str(".popsection\n");
+
+    assembly
+}
+
+pub fn bytes_to_asm(bytes: &[u8]) -> String {
+    use std::fmt::Write;
+
+    let mut out = String::with_capacity(bytes.len() * 11);
+    for &byte in bytes {
+        writeln!(&mut out, ".byte 0x{:02x}", byte).unwrap();
+    }
+
+    out
+}

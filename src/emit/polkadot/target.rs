@@ -729,6 +729,7 @@ impl<'a> TargetRuntime<'a> for PolkadotTarget {
                 i32_zero!().into()
             ]
         );
+        binary.builder.build_return(None);
 
         binary.builder.build_unreachable();
     }
@@ -766,6 +767,7 @@ impl<'a> TargetRuntime<'a> for PolkadotTarget {
             "seal_return",
             &[i32_zero!().into(), data.into(), data_len.into()]
         );
+        binary.builder.build_return(None);
 
         binary.builder.build_unreachable();
     }
@@ -775,6 +777,7 @@ impl<'a> TargetRuntime<'a> for PolkadotTarget {
 
         let flags = i32_const!(1).into(); // First bit set means revert
         call!("seal_return", &[flags, data.into(), length.into()]);
+        binary.builder.build_return(None);
 
         // Inserting an "unreachable" instruction signals to the LLVM optimizer
         // that any following code can not be reached.

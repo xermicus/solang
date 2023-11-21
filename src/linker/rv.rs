@@ -1,8 +1,4 @@
-use std::{
-    ffi::CString,
-    fs::File,
-    io::{Read, Write},
-};
+use std::{ffi::CString, fs::File, io::Write};
 
 use tempfile::tempdir;
 
@@ -69,13 +65,16 @@ SECTIONS {
 
     assert!(!super::elf_linker(&command_line), "linker failed");
 
-    let mut output = Vec::new();
-    // read the whole file
-    let mut outputfile = File::open(res_filename).expect("output file should exist");
+    let mut config = polkavm_linker::Config::default();
+    config.set_strip(true);
+    let code = std::fs::read(&res_filename).unwrap();
+    std::fs::write("/home/cyrill/mess/solang/out.so", &code).unwrap();
+    let output = match polkavm_linker::program_from_elf(config, &code) {
+        Ok(blob) => blob.as_bytes().to_vec(),
+        Err(reason) => panic!("polkavm linker failed: {}", reason),
+    };
 
-    outputfile
-        .read_to_end(&mut output)
-        .expect("failed to read output file");
+    polkavm_common::program::ProgramBlob::parse(&output[..]).expect("Valid PVM blob after linker");
 
     output
 }

@@ -87,8 +87,6 @@ impl PolkadotTarget {
         target.emit_dispatch(None, &mut binary, ns);
 
         binary.internalize(&[
-            "deploy",
-            "call",
             "call_chain_extension",
             "input",
             "set_storage",
@@ -283,7 +281,10 @@ impl PolkadotTarget {
         } else {
             "call"
         };
-        let func = bin.module.add_function(export_name, ty, None);
+        let func = bin
+            .module
+            .add_function(export_name, ty, Some(Linkage::External));
+        func.set_section(Some(".text.polkavm_export"));
         let (input, input_length) = self.public_function_prelude(bin, func, storage_initializer);
         let args = vec![
             BasicMetadataValueEnum::PointerValue(input),
