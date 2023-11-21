@@ -68,7 +68,7 @@ SECTIONS {
     let mut config = polkavm_linker::Config::default();
     config.set_strip(true);
     let code = std::fs::read(&res_filename).unwrap();
-    std::fs::write("/home/cyrill/mess/solang/out.so", &code).unwrap();
+    //std::fs::write("/home/cyrill/mess/solang/out.so", &code).unwrap();
     let output = match polkavm_linker::program_from_elf(config, &code) {
         Ok(blob) => blob.as_bytes().to_vec(),
         Err(reason) => panic!("polkavm linker failed: {}", reason),

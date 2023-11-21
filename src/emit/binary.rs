@@ -1315,13 +1315,13 @@ pub(super) fn pvm_exports<'a>(ctx: &'a Context) -> (Module<'a>, Module<'a>) {
     let call_m = ctx.create_module("pvm_call");
     let deploy_m = ctx.create_module("pvm_deploy");
 
-    call_m.set_inline_assembly(&generate_export_assembly("call", [0, 0, 0, 0]));
-    deploy_m.set_inline_assembly(&generate_export_assembly("deploy", [0, 0, 0, 0]));
+    call_m.set_inline_assembly(&generate_export_assembly("call"));
+    deploy_m.set_inline_assembly(&generate_export_assembly("deploy"));
 
     (call_m, deploy_m)
 }
 
-fn generate_export_assembly(symbol: &str, addres: [u8; 4]) -> String {
+fn generate_export_assembly(symbol: &str) -> String {
     let mut assembly = String::new();
 
     assembly.push_str(".pushsection .polkavm_exports,\"\",@progbits\n");

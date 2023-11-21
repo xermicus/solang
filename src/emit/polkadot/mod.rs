@@ -69,7 +69,7 @@ impl PolkadotTarget {
 
         let mut target = PolkadotTarget;
 
-        target.declare_externals(&binary);
+        //target.declare_externals(&binary);
 
         emit_functions(&mut target, &mut binary, contract, ns);
 
@@ -87,36 +87,36 @@ impl PolkadotTarget {
         target.emit_dispatch(None, &mut binary, ns);
 
         binary.internalize(&[
-            "call_chain_extension",
+            //"call_chain_extension",
             "input",
-            "set_storage",
-            "get_storage",
-            "clear_storage",
-            "hash_keccak_256",
-            "hash_sha2_256",
-            "hash_blake2_128",
-            "hash_blake2_256",
+            //"set_storage",
+            //"get_storage",
+            //"clear_storage",
+            //"hash_keccak_256",
+            //"hash_sha2_256",
+            //"hash_blake2_128",
+            //"hash_blake2_256",
             "seal_return",
-            "debug_message",
-            "instantiate",
-            "seal_call",
-            "delegate_call",
-            "code_hash",
+            //"debug_message",
+            //"instantiate",
+            //"seal_call",
+            //"delegate_call",
+            //"code_hash",
             "value_transferred",
-            "minimum_balance",
-            "weight_to_fee",
-            "instantiation_nonce",
-            "address",
-            "balance",
-            "block_number",
-            "now",
-            "gas_left",
-            "caller",
-            "terminate",
-            "deposit_event",
-            "transfer",
-            "is_contract",
-            "set_code_hash",
+            //"minimum_balance",
+            //"weight_to_fee",
+            //"instantiation_nonce",
+            //"address",
+            //"balance",
+            //"block_number",
+            //"now",
+            //"gas_left",
+            //"caller",
+            //"terminate",
+            //"deposit_event",
+            //"transfer",
+            //"is_contract",
+            //"set_code_hash",
         ]);
 
         binary
@@ -186,8 +186,7 @@ impl PolkadotTarget {
                 binary.module.add_function(
                     $name,
                     ctx.$fn_type().fn_type(&[$($args),*], false),
-                    //Some(Linkage::External),
-                    None,
+                    Some(Linkage::Internal),
                 );
             };
         }
@@ -297,7 +296,6 @@ impl PolkadotTarget {
             .unwrap_or(DispatchType::Call)
             .to_string();
         let cfg = bin.module.get_function(dispatch_cfg_name).unwrap();
-        cfg.set_linkage(Linkage::External);
         bin.builder.build_call(cfg, &args, dispatch_cfg_name);
         bin.builder.build_return(None);
 
