@@ -6,10 +6,6 @@
 
 #include "stdlib.h"
 
-#ifdef __riscv
-#include "polkavm_guest.h"
-#endif
-
 /*
  */
 void __memset8(void *_dest, uint64_t val, uint32_t length)
