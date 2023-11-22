@@ -1224,25 +1224,6 @@ impl<'a> Binary<'a> {
 /// Return the stdlib as parsed llvm module. The solidity standard library is hardcoded into
 /// the solang library
 fn load_stdlib<'a>(context: &'a Context, target: &Target) -> Module<'a> {
-    //let memory = MemoryBuffer::create_from_memory_range(RISCV_IR[0], "riscv_bc");
-
-    //let module = Module::parse_bitcode_from_buffer(&memory, context).unwrap();
-
-    //for bc in RISCV_IR.iter().skip(1) {
-    //    let memory = MemoryBuffer::create_from_memory_range(bc, "riscv_bc");
-
-    //    module
-    //        .link_in_module(Module::parse_bitcode_from_buffer(&memory, context).unwrap())
-    //        .unwrap();
-    //}
-
-    //let memory = MemoryBuffer::create_from_memory_range(WASM_RIPEMD160_IR, "ripemd160");
-    //module
-    //    .link_in_module(Module::parse_bitcode_from_buffer(&memory, context).unwrap())
-    //    .unwrap();
-
-    //return module;
-
     #[cfg(feature = "solana")]
     if *target == Target::Solana {
         let memory = MemoryBuffer::create_from_memory_range(BPF_IR[0], "bpf_bc");
@@ -1272,15 +1253,6 @@ fn load_stdlib<'a>(context: &'a Context, target: &Target) -> Module<'a> {
             .unwrap();
     }
 
-    //if let Target::Polkadot { .. } = *target {
-    //    // contracts pallet does not provide ripemd160
-    //    let memory = MemoryBuffer::create_from_memory_range(RISCV_RIPEMD160_IR, "ripemd160");
-
-    //    module
-    //        .link_in_module(Module::parse_bitcode_from_buffer(&memory, context).unwrap())
-    //        .unwrap();
-    //}
-
     module
 }
 
@@ -1301,15 +1273,16 @@ static WASM_IR: [&[u8]; 4] = [
     include_bytes!("../../target/wasm/format.bc"),
 ];
 
-static RISCV_IR: [&[u8]; 4] = [
+static RISCV_IR: [&[u8]; 5] = [
     include_bytes!("../../target/riscv/stdlib.bc"),
     include_bytes!("../../target/riscv/heap.bc"),
     include_bytes!("../../target/riscv/bigint.bc"),
     include_bytes!("../../target/riscv/format.bc"),
+    include_bytes!("../../target/riscv/polkavm_guest.bc"),
+    //include_bytes!("../../target/riscv/ripemd160.bc"),
 ];
 
 static WASM_RIPEMD160_IR: &[u8] = include_bytes!("../../target/wasm/ripemd160.bc");
-static RISCV_RIPEMD160_IR: &[u8] = include_bytes!("../../target/wasm/ripemd160.bc");
 
 pub(super) fn pvm_exports<'a>(ctx: &'a Context) -> (Module<'a>, Module<'a>) {
     let call_m = ctx.create_module("pvm_call");

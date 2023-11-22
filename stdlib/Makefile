@@ -13,7 +13,7 @@ CFLAGS=$(TARGET_FLAGS) -emit-llvm -O3 -ffreestanding -fno-builtin -Wall -fno-bui
 
 SOLANA=$(addprefix ../target/bpf/,solana.bc bigint.bc format.bc stdlib.bc ripemd160.bc heap.bc)
 WASM=$(addprefix ../target/wasm/,ripemd160.bc stdlib.bc bigint.bc format.bc heap.bc)
-RISCV=$(addprefix ../target/riscv/,ripemd160.bc stdlib.bc bigint.bc format.bc heap.bc)
+RISCV=$(addprefix ../target/riscv/,polkavm_guest.bc ripemd160.bc stdlib.bc bigint.bc format.bc heap.bc)
 
 all: $(SOLANA) $(WASM)
 riscv: $(RISCV)
@@ -26,6 +26,7 @@ $(WASM): TARGET_FLAGS=--target=wasm32
 $(RISCV): TARGET_FLAGS=--target=riscv32 -march=rv32em -mabi=ilp32e -nostdlib -nodefaultlibs -ffast-math -fno-rtti -mrelax -fPIC -fPIE -fno-exceptions
 
 bpf/solana.bc: solana.c solana_sdk.h | outputs_dirs
+riscv/polkavm_guest.bc: polkavm_guest.c polkavm_guest.h | outputs_dirs
 
 outputs_dirs:
 	@mkdir -p ../target/bpf ../target/wasm ../target/riscv
