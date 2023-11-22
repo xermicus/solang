@@ -157,16 +157,19 @@ static void __attribute__ ((naked, used)) POLKAVM_UNIQUE(polkavm_import_dummy)()
         : \
     ); \
 }
-//arg_return_ty __attribute__ ((naked)) fn_name(POLKAVM_IMPORT_ARGS_IMPL(__VA_ARGS__)) { \
-//    __asm__( \
-//        ".word 0x0000000b\n" \
-//        ".word __polkavm_import_" #fn_name "\n" \
-//        "ret\n" \
-//        : \
-//        : \
-//        : "memory" \
-//    ); \
-//}
+
+// LLVM bitcode stores type information, need to preserve the signature
+#define POLKAVM_ECALLI_TRAMPOLINE(arg_return_ty, fn_name, index, ...) { \
+    __asm__( \
+        ".word 0x0000000b\n" \
+        ".word __polkavm_import_" #fn_name "\n" \
+        "ret\n" \
+        : \
+        : \
+        : "memory" \
+    ); \
+} \
+POLKAVM_IMPORT(arg_return_ty, fn_name, index, ## __VA_ARGS__);
 
 #define POLKAVM_MIN_STACK_SIZE(size) \
 static void __attribute__ ((naked, used)) POLKAVM_UNIQUE(polkavm_stack_size)() { \
