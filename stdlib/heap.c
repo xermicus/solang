@@ -28,7 +28,7 @@ struct chunk
 #ifdef __riscv
 // Just throwing it into .bss
 #define HEAP_SIZE 0x100000
-uint8_t* RISCV_HEAP[HEAP_SIZE]={0};
+uint8_t* RISCV_HEAP[HEAP_SIZE];
 #define HEAP_START ((struct chunk *)(&RISCV_HEAP))
 
 void __init_heap()
@@ -36,7 +36,7 @@ void __init_heap()
     struct chunk *first = HEAP_START;
     first->next = first->prev = NULL;
     first->allocated = false;
-    first->length = (uint32_t)(HEAP_SIZE - (size_t)first - sizeof(struct chunk));
+    first->length = (32 * 1024) - sizeof(struct chunk);
 }
 #else
 #define HEAP_START ((struct chunk *)0x300000000)
@@ -114,6 +114,9 @@ void *__attribute__((noinline)) __malloc(uint32_t size)
     else
     {
         // go bang
+#ifdef __riscv
+        __asm__("unimp\n" :::);
+#endif
 #if defined(__wasm__) || defined(__riscv)
         __builtin_unreachable();
 #else
