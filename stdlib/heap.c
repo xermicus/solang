@@ -25,15 +25,18 @@ struct chunk
     uint32_t allocated;
 };
 
-#ifdef __wasm__
-#define HEAP_START ((struct chunk *)0x10000)
+#ifdef __riscv
+// Just throwing it into .bss
+#define HEAP_SIZE 0x100000
+uint8_t* RISCV_HEAP[HEAP_SIZE]={0};
+#define HEAP_START ((struct chunk *)(&RISCV_HEAP))
 
 void __init_heap()
 {
     struct chunk *first = HEAP_START;
     first->next = first->prev = NULL;
     first->allocated = false;
-    first->length = (uint32_t)(__builtin_wasm_memory_size(0) * 0x10000 - (size_t)first - sizeof(struct chunk));
+    first->length = (uint32_t)(HEAP_SIZE - (size_t)first - sizeof(struct chunk));
 }
 #else
 #define HEAP_START ((struct chunk *)0x300000000)

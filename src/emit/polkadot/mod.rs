@@ -89,15 +89,15 @@ impl PolkadotTarget {
         binary.internalize(&[
             //"call_chain_extension",
             "input",
-            //"set_storage",
-            //"get_storage",
+            "set_storage",
+            "get_storage",
             //"clear_storage",
             //"hash_keccak_256",
             //"hash_sha2_256",
             //"hash_blake2_128",
             //"hash_blake2_256",
             "seal_return",
-            //"debug_message",
+            "debug_message",
             //"instantiate",
             //"seal_call",
             //"delegate_call",
@@ -112,7 +112,7 @@ impl PolkadotTarget {
             //"now",
             //"gas_left",
             //"caller",
-            //"terminate",
+            "terminate",
             //"deposit_event",
             //"transfer",
             //"is_contract",
@@ -297,7 +297,6 @@ impl PolkadotTarget {
             .to_string();
         let cfg = bin.module.get_function(dispatch_cfg_name).unwrap();
         bin.builder.build_call(cfg, &args, dispatch_cfg_name);
-        bin.builder.build_return(None);
 
         bin.builder.build_unreachable();
     }

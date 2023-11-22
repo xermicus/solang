@@ -36,7 +36,7 @@ pub(super) fn emit_functions<'a, T: TargetRuntime<'a>>(
                 func
             } else {
                 bin.module
-                    .add_function(&cfg.name, ftype, Some(Linkage::Internal))
+                    .add_function(&cfg.name, ftype, Some(Linkage::External))
             };
 
             bin.functions.insert(cfg_no, func_decl);

@@ -156,7 +156,7 @@ static void __attribute__ ((naked, used)) POLKAVM_UNIQUE(polkavm_import_dummy)()
           [dummy] "i" (0) \
         : \
     ); \
-} \
+}
 //arg_return_ty __attribute__ ((naked)) fn_name(POLKAVM_IMPORT_ARGS_IMPL(__VA_ARGS__)) { \
 //    __asm__( \
 //        ".word 0x0000000b\n" \
