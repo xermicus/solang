@@ -1311,7 +1311,7 @@ impl<'a> TargetRuntime<'a> for PolkadotTarget {
                         binary
                             .builder
                             .build_int_to_ptr(
-                                binary.context.i32_type().const_all_ones(),
+                                binary.context.i32_type().const_zero(),
                                 byte_ptr!(),
                                 "no_initializer",
                             )

@@ -181,7 +181,7 @@ impl StorageSlot for PolkadotTarget {
                         "size_of",
                     );
                     let init = bin.builder.build_int_to_ptr(
-                        bin.context.i32_type().const_all_ones(),
+                        bin.context.i32_type().const_zero(),
                         bin.context.i8_type().ptr_type(AddressSpace::default()),
                         "invalid",
                     );

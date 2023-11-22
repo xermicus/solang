@@ -42,7 +42,7 @@ impl PolkadotTarget {
         );
 
         binary.vector_init_empty = binary.builder.build_int_to_ptr(
-            binary.context.i32_type().const_all_ones(),
+            binary.context.i32_type().const_zero(),
             binary.context.i8_type().ptr_type(AddressSpace::default()),
             "empty_vector",
         );
