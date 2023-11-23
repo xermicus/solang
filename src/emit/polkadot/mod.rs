@@ -69,7 +69,7 @@ impl PolkadotTarget {
 
         let mut target = PolkadotTarget;
 
-        //target.declare_externals(&binary);
+        target.declare_externals(&binary);
 
         emit_functions(&mut target, &mut binary, contract, ns);
 
@@ -186,7 +186,7 @@ impl PolkadotTarget {
                 binary.module.add_function(
                     $name,
                     ctx.$fn_type().fn_type(&[$($args),*], false),
-                    Some(Linkage::Internal),
+                    Some(Linkage::External),
                 );
             };
         }
