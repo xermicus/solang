@@ -71,8 +71,8 @@ forge-fmt = { version = "0.2.0", optional = true }
 # We don't use ethers-core directly, but need the correct version for the
 # build to work.
 ethers-core = { version = "2.0.10", optional = true }
-polkavm-common = { path = "../polkavm/crates/polkavm-common", features = ["alloc"] }
-polkavm-linker = { path = "../polkavm/crates/polkavm-linker" }
+polkavm-common = { git = "https://github.com/koute/polkavm.git", features = ["alloc"] }
+polkavm-linker = { git = "https://github.com/koute/polkavm.git" }
 
 [dev-dependencies]
 num-derive = "0.4"
