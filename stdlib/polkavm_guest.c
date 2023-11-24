@@ -8,8 +8,11 @@ uint32_t __attribute__ ((naked)) set_storage(uint8_t *key_ptr, uint32_t key_len,
 uint32_t __attribute__ ((naked)) get_storage(uint8_t *key_ptr, uint32_t key_len, uint8_t *out_ptr, uint32_t *out_len_ptr) 
     POLKAVM_ECALLI_TRAMPOLINE(uint32_t, get_storage, 3, uint32_t, uint32_t, uint32_t, uint32_t)
 
-uint32_t __attribute__ ((naked)) seal_call(uint8_t *ptr)
-    POLKAVM_ECALLI_TRAMPOLINE(void, seal_call, 7, uint32_t)
+uint32_t __attribute__ ((naked)) seal_call(uint32_t dummy, uint8_t *ptr)
+    POLKAVM_ECALLI_TRAMPOLINE(void, seal_call, 7, uint32_t, uint32_t)
+
+uint32_t __attribute__ ((naked)) instantiate(uint32_t dummy, uint8_t *ptr)
+    POLKAVM_ECALLI_TRAMPOLINE(void, instantiate, 10, uint32_t, uint32_t)
 
 void __attribute__ ((naked)) terminate()
     POLKAVM_ECALLI_TRAMPOLINE(void, terminate, 12)
@@ -28,3 +31,6 @@ void __attribute__ ((naked)) hash_keccak_256(uint8_t *input_ptr, uint32_t input_
 
 uint32_t __attribute__ ((naked)) debug_message(uint8_t *str_ptr, uint32_t str_len) 
     POLKAVM_ECALLI_TRAMPOLINE(uint32_t, debug_message, 37, uint32_t, uint32_t)
+
+uint64_t __attribute__ ((naked)) instantiation_nonce()
+    POLKAVM_ECALLI_TRAMPOLINE(void, instantiation_nonce, 45)

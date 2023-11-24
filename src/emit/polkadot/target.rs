@@ -10,7 +10,7 @@ use crate::emit::{ContractArgs, TargetRuntime, Variable};
 use crate::sema::ast;
 use crate::sema::ast::{Function, Namespace, Type};
 use crate::{codegen, emit_context};
-use inkwell::types::{BasicType, BasicTypeEnum, IntType};
+use inkwell::types::{BasicType, BasicTypeEnum, IntType, StructType};
 use inkwell::values::BasicValue;
 use inkwell::values::{
     ArrayValue, BasicMetadataValueEnum, BasicValueEnum, FunctionValue, IntValue, PointerValue,
@@ -871,26 +871,40 @@ impl<'a> TargetRuntime<'a> for PolkadotTarget {
             .builder
             .build_store(scratch_len, i32_const!(SCRATCH_SIZE as u64 * 32));
 
-        let ret = call!(
-            "instantiate",
+        let instantiate_args = binary.context.struct_type(
             &[
-                codehash.into(),
-                contract_args.gas.unwrap().into(),
-                value_ptr.into(),
-                encoded_args.into(),
-                encoded_args_len.into(),
-                address.into(),
-                address_len_ptr.into(),
-                scratch_buf.into(),
-                scratch_len.into(),
-                salt_buf.into(),
-                salt_len.into(),
-            ]
-        )
-        .try_as_basic_value()
-        .left()
-        .unwrap()
-        .into_int_value();
+                byte_ptr!().as_basic_type_enum(),
+                binary.context.i64_type().as_basic_type_enum(),
+                byte_ptr!().as_basic_type_enum(),
+                byte_ptr!().as_basic_type_enum(),
+                binary.context.i32_type().as_basic_type_enum(),
+                byte_ptr!().as_basic_type_enum(),
+                i32_ptr!().as_basic_type_enum(),
+                byte_ptr!().as_basic_type_enum(),
+                i32_ptr!().as_basic_type_enum(),
+                byte_ptr!().as_basic_type_enum(),
+                binary.context.i32_type().as_basic_type_enum(),
+            ],
+            true,
+        );
+        let call_args = StackArgs::new(binary, instantiate_args)
+            .push(codehash)
+            .push(contract_args.gas.unwrap())
+            .push(value_ptr)
+            .push(encoded_args)
+            .push(encoded_args_len)
+            .push(address)
+            .push(address_len_ptr)
+            .push(scratch_buf)
+            .push(scratch_len)
+            .push(salt_buf)
+            .push(salt_len)
+            .arg_ptr();
+        let ret = call!("instantiate", &[i32_zero!().into(), call_args.into()])
+            .try_as_basic_value()
+            .left()
+            .unwrap()
+            .into_int_value();
 
         log_return_code(binary, "seal_instantiate", ret);
 
@@ -927,23 +941,34 @@ impl<'a> TargetRuntime<'a> for PolkadotTarget {
                 binary
                     .builder
                     .build_store(value_ptr, contract_args.value.unwrap());
-                let ret = call!(
-                    "seal_call",
+                let call_args = binary.context.struct_type(
                     &[
-                        contract_args.flags.unwrap_or(i32_zero!()).into(),
-                        address.unwrap().into(),
-                        contract_args.gas.unwrap().into(),
-                        value_ptr.into(),
-                        payload.into(),
-                        payload_len.into(),
-                        scratch_buf.into(),
-                        scratch_len.into(),
-                    ]
-                )
-                .try_as_basic_value()
-                .left()
-                .unwrap()
-                .into_int_value();
+                        binary.context.i32_type().as_basic_type_enum(),
+                        byte_ptr!().as_basic_type_enum(),
+                        binary.context.i64_type().as_basic_type_enum(),
+                        byte_ptr!().as_basic_type_enum(),
+                        byte_ptr!().as_basic_type_enum(),
+                        binary.context.i32_type().as_basic_type_enum(),
+                        byte_ptr!().as_basic_type_enum(),
+                        i32_ptr!().as_basic_type_enum(),
+                    ],
+                    true,
+                );
+                let arg_ptr = StackArgs::new(binary, call_args)
+                    .push(contract_args.flags.unwrap_or(i32_zero!()))
+                    .push(address.unwrap())
+                    .push(contract_args.gas.unwrap())
+                    .push(value_ptr)
+                    .push(payload)
+                    .push(payload_len)
+                    .push(scratch_buf)
+                    .push(scratch_len)
+                    .arg_ptr();
+                let ret = call!("seal_call", &[i32_zero!().into(), arg_ptr.into()])
+                    .try_as_basic_value()
+                    .left()
+                    .unwrap()
+                    .into_int_value();
                 log_return_code(binary, "seal_call", ret);
                 ret.as_basic_value_enum()
             }
@@ -1637,5 +1662,44 @@ impl<'a> TargetRuntime<'a> for PolkadotTarget {
     ) -> IntValue<'a> {
         // not needed for slot-based storage chains
         unimplemented!()
+    }
+}
+
+struct StackArgs<'a, 'b> {
+    binary: &'b Binary<'a>,
+    ptr: PointerValue<'a>,
+    ty: StructType<'a>,
+    field: u32,
+}
+
+impl<'a, 'b> StackArgs<'a, 'b> {
+    fn new(binary: &'b Binary<'a>, ty: StructType<'a>) -> Self {
+        Self {
+            binary,
+            ptr: binary.builder.build_alloca(ty, "stack_args"),
+            ty,
+            field: 0,
+        }
+    }
+
+    fn push<V: BasicValue<'a>>(mut self, value: V) -> Self {
+        let field_name = &format!("stack_args_{}", self.field);
+        let ptr = self
+            .binary
+            .builder
+            .build_struct_gep(self.ty, self.ptr, self.field, field_name)
+            .expect("tried to push too many arguments");
+        self.binary.builder.build_store(ptr, value);
+        self.field += 1;
+        self
+    }
+
+    fn arg_ptr(&self) -> PointerValue<'a> {
+        assert!(
+            self.ty.get_field_type_at_index(self.field).is_none(),
+            "there must not be any missing arguments"
+        );
+
+        self.ptr
     }
 }

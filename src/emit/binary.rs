@@ -53,6 +53,13 @@ macro_rules! emit_context {
         }
 
         #[allow(unused_macros)]
+        macro_rules! i32_ptr {
+            () => {
+                $binary.context.i32_type().ptr_type(AddressSpace::default())
+            };
+        }
+
+        #[allow(unused_macros)]
         macro_rules! i32_const {
             ($val:expr) => {
                 $binary.context.i32_type().const_int($val, false)
@@ -268,9 +275,9 @@ impl<'a> Binary<'a> {
         // so eliminating them now will cause link errors. Either we should prevent these
         // calls from being done in the first place or do dce at link time
         let mut export_list = export_list.to_vec();
-        //export_list.push("__ashlti3");
-        //export_list.push("__lshrti3");
-        //export_list.push("__ashrti3");
+        export_list.push("__ashlti3");
+        export_list.push("__lshrti3");
+        export_list.push("__ashrti3");
 
         while let Some(f) = func {
             let name = f.get_name().to_str().unwrap();

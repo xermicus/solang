@@ -69,7 +69,7 @@ impl PolkadotTarget {
 
         let mut target = PolkadotTarget;
 
-        target.declare_externals(&binary);
+        //target.declare_externals(&binary);
 
         emit_functions(&mut target, &mut binary, contract, ns);
 
@@ -98,14 +98,14 @@ impl PolkadotTarget {
             //"hash_blake2_256",
             "seal_return",
             "debug_message",
-            //"instantiate",
+            "instantiate",
             "seal_call",
             //"delegate_call",
             //"code_hash",
             "value_transferred",
             //"minimum_balance",
             //"weight_to_fee",
-            //"instantiation_nonce",
+            "instantiation_nonce",
             //"address",
             //"balance",
             //"block_number",
