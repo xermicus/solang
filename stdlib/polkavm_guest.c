@@ -115,5 +115,5 @@ uint32_t __attribute__ ((naked)) set_code_hash(uint8_t *code_hash_ptr)
 uint64_t __attribute__ ((naked)) instantiation_nonce()
     POLKAVM_ECALLI_TRAMPOLINE(void, instantiation_nonce, 45)
 
-uint32_t __attribute__ ((naked)) transfer(uint8_t *account_ptr, uint8_t *value_ptr) 
-    POLKAVM_ECALLI_TRAMPOLINE(uint32_t, transfer, 48, uint32_t, uint32_t)
+uint32_t __attribute__ ((naked)) transfer(uint8_t *account_ptr, uint32_t account_len, uint8_t *value_ptr, uint32_t value_len) 
+    POLKAVM_ECALLI_TRAMPOLINE(uint32_t, transfer, 6, uint32_t, uint32_t, uint32_t, uint32_t)
