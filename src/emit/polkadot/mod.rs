@@ -111,7 +111,7 @@ impl PolkadotTarget {
             //"block_number",
             //"now",
             //"gas_left",
-            //"caller",
+            "caller",
             "terminate",
             //"deposit_event",
             //"transfer",

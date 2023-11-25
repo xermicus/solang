@@ -900,7 +900,7 @@ impl<'a> TargetRuntime<'a> for PolkadotTarget {
             .push(salt_buf)
             .push(salt_len)
             .arg_ptr();
-        let ret = call!("instantiate", &[i32_zero!().into(), call_args.into()])
+        let ret = call!("instantiate", &[call_args.into()])
             .try_as_basic_value()
             .left()
             .unwrap()
@@ -964,7 +964,7 @@ impl<'a> TargetRuntime<'a> for PolkadotTarget {
                     .push(scratch_buf)
                     .push(scratch_len)
                     .arg_ptr();
-                let ret = call!("seal_call", &[i32_zero!().into(), arg_ptr.into()])
+                let ret = call!("seal_call", &[arg_ptr.into()])
                     .try_as_basic_value()
                     .left()
                     .unwrap()
