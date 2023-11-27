@@ -47,6 +47,7 @@ SECTIONS {
         CString::new("--relocatable").unwrap(),
         CString::new("--emit-relocs").unwrap(),
         CString::new("--no-relax").unwrap(),
+        CString::new("--gc-sections").unwrap(),
         CString::new(
             linker_script_filename
                 .to_str()
