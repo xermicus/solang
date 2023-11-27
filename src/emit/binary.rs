@@ -1280,13 +1280,13 @@ static WASM_IR: [&[u8]; 4] = [
     include_bytes!("../../target/wasm/format.bc"),
 ];
 
-static RISCV_IR: [&[u8]; 5] = [
+static RISCV_IR: [&[u8]; 6] = [
     include_bytes!("../../target/riscv/stdlib.bc"),
     include_bytes!("../../target/riscv/heap.bc"),
     include_bytes!("../../target/riscv/bigint.bc"),
     include_bytes!("../../target/riscv/format.bc"),
     include_bytes!("../../target/riscv/polkavm_guest.bc"),
-    //include_bytes!("../../target/riscv/ripemd160.bc"),
+    include_bytes!("../../target/riscv/ripemd160.bc"),
 ];
 
 static WASM_RIPEMD160_IR: &[u8] = include_bytes!("../../target/wasm/ripemd160.bc");

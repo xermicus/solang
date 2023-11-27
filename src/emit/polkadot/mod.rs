@@ -69,7 +69,7 @@ impl PolkadotTarget {
 
         let mut target = PolkadotTarget;
 
-        //target.declare_externals(&binary);
+        target.declare_externals(&binary);
 
         emit_functions(&mut target, &mut binary, contract, ns);
 
@@ -175,96 +175,13 @@ impl PolkadotTarget {
     }
 
     fn declare_externals(&self, binary: &Binary) {
-        let ctx = binary.context;
-        let u8_ptr = ctx.i8_type().ptr_type(AddressSpace::default()).into();
-        let u32_val = ctx.i32_type().into();
-        let u32_ptr = ctx.i32_type().ptr_type(AddressSpace::default()).into();
-        let u64_val = ctx.i64_type().into();
-
-        macro_rules! external {
-            ($name:literal, $fn_type:ident, $( $args:expr ),*) => {
-                binary.module.add_function(
-                    $name,
-                    ctx.$fn_type().fn_type(&[$($args),*], false),
-                    Some(Linkage::External),
-                );
-            };
-        }
-
-        external!(
-            "call_chain_extension",
-            i32_type,
-            u32_val,
-            u8_ptr,
-            u32_val,
-            u8_ptr,
-            u32_ptr
-        );
-        external!("input", void_type, u8_ptr, u32_ptr);
-        external!("hash_keccak_256", void_type, u8_ptr, u32_val, u8_ptr);
-        external!("hash_sha2_256", void_type, u8_ptr, u32_val, u8_ptr);
-        external!("hash_blake2_128", void_type, u8_ptr, u32_val, u8_ptr);
-        external!("hash_blake2_256", void_type, u8_ptr, u32_val, u8_ptr);
-        external!("instantiation_nonce", i64_type,);
-        external!("set_storage", i32_type, u8_ptr, u32_val, u8_ptr, u32_val);
-        external!("debug_message", i32_type, u8_ptr, u32_val);
-        external!("clear_storage", i32_type, u8_ptr, u32_val);
-        external!("get_storage", i32_type, u8_ptr, u32_val, u8_ptr, u32_ptr);
-        external!("seal_return", void_type, u32_val, u8_ptr, u32_val);
-        external!(
-            "instantiate",
-            i32_type,
-            u8_ptr,
-            u64_val,
-            u8_ptr,
-            u8_ptr,
-            u32_val,
-            u8_ptr,
-            u32_ptr,
-            u8_ptr,
-            u32_ptr,
-            u8_ptr,
-            u32_val
-        );
-        // We still use prefixed seal_call because it would collide with the exported call function.
-        // TODO: Refactor emit to use a dedicated module for the externals to avoid any collisions.
-        external!(
-            "seal_call",
-            i32_type,
-            u32_val,
-            u8_ptr,
-            u64_val,
-            u8_ptr,
-            u8_ptr,
-            u32_val,
-            u8_ptr,
-            u32_ptr
-        );
-        external!(
-            "delegate_call",
-            i32_type,
-            u32_val,
-            u8_ptr,
-            u8_ptr,
-            u32_val,
-            u8_ptr,
-            u32_ptr
-        );
-        external!("code_hash", i32_type, u8_ptr, u8_ptr, u32_ptr);
-        external!("transfer", i32_type, u8_ptr, u32_val, u8_ptr, u32_val);
-        external!("value_transferred", void_type, u8_ptr, u32_ptr);
-        external!("address", void_type, u8_ptr, u32_ptr);
-        external!("balance", void_type, u8_ptr, u32_ptr);
-        external!("minimum_balance", void_type, u8_ptr, u32_ptr);
-        external!("block_number", void_type, u8_ptr, u32_ptr);
-        external!("now", void_type, u8_ptr, u32_ptr);
-        external!("weight_to_fee", void_type, u64_val, u8_ptr, u32_ptr);
-        external!("gas_left", void_type, u8_ptr, u32_ptr);
-        external!("caller", void_type, u8_ptr, u32_ptr);
-        external!("terminate", void_type, u8_ptr);
-        external!("deposit_event", void_type, u8_ptr, u32_val, u8_ptr, u32_val);
-        external!("is_contract", i32_type, u8_ptr);
-        external!("set_code_hash", i32_type, u8_ptr);
+        // polkavm doesn't like unrelocated auipc instructions
+        // force it to parcipate in linkage by setting `Linkage::External`
+        binary
+            .module
+            .get_function("ripemd160_compress")
+            .expect("ripemd160 bitcode is linked in module")
+            .set_linkage(Linkage::External);
     }
 
     /// Emits the "deploy" function if `storage_initializer` is `Some`, otherwise emits the "call" function.
