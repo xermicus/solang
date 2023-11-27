@@ -23,7 +23,7 @@ $(SOLANA) $(WASM) $(RISCV): | outputs_dirs
 
 $(SOLANA): TARGET_FLAGS=--target=sbf
 $(WASM): TARGET_FLAGS=--target=wasm32
-$(RISCV): TARGET_FLAGS=--target=riscv32 -march=rv32em -mabi=ilp32e -nostdlib -nodefaultlibs -ffast-math -fno-rtti -mrelax -fPIC -fPIE -fno-exceptions
+$(RISCV): TARGET_FLAGS=--target=riscv32 -march=rv32em -mabi=ilp32e -nostdlib -nodefaultlibs -fforce-enable-int128 -ffast-math -fno-rtti -mrelax -fPIC -fPIE -fno-exceptions
 
 bpf/solana.bc: solana.c solana_sdk.h | outputs_dirs
 riscv/polkavm_guest.bc: polkavm_guest.c polkavm_guest.h | outputs_dirs
