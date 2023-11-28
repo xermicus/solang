@@ -1145,6 +1145,7 @@ impl<'a> TargetRuntime<'a> for PolkadotTarget {
         binary.builder.build_store(address, addr);
 
         call!("terminate", &[address.into()], "terminated");
+        binary.builder.build_return(None);
 
         binary.builder.build_unreachable();
     }

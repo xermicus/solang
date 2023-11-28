@@ -1,6 +1,6 @@
 CC=/opt/clang-rv32e/bin/clang
 BIT_INT_FLAGS=-Xclang -fexperimental-max-bitint-width=512
-CFLAGS=$(TARGET_FLAGS) -emit-llvm -O3 -ffreestanding -fno-builtin -Wall -fno-builtin -Wno-unused-function $(BIT_INT_FLAGS)
+CFLAGS=$(TARGET_FLAGS) -emit-llvm -O3 -ffreestanding -fno-builtin -Wall -Wno-unused-function $(BIT_INT_FLAGS)
 
 ../target/bpf/%.bc: %.c
 	$(CC) -c $(CFLAGS) $< -o $@
@@ -23,7 +23,7 @@ $(SOLANA) $(WASM) $(RISCV): | outputs_dirs
 
 $(SOLANA): TARGET_FLAGS=--target=sbf
 $(WASM): TARGET_FLAGS=--target=wasm32
-$(RISCV): TARGET_FLAGS=--target=riscv32 -march=rv32em -mabi=ilp32e -fforce-enable-int128
+$(RISCV): TARGET_FLAGS=--target=riscv32 -march=rv32em -mabi=ilp32e -fforce-enable-int128 -fno-exceptions
 
 bpf/solana.bc: solana.c solana_sdk.h | outputs_dirs
 riscv/polkavm_guest.bc: polkavm_guest.c polkavm_guest.h | outputs_dirs

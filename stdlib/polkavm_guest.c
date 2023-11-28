@@ -32,8 +32,8 @@ uint32_t __attribute__ ((naked)) delegate_call(
 uint32_t __attribute__ ((naked)) instantiate(uint8_t *ptr)
     POLKAVM_ECALLI_TRAMPOLINE(uint32_t, instantiate, 10, uint32_t)
 
-void __attribute__ ((naked)) terminate()
-    POLKAVM_ECALLI_TRAMPOLINE(void, terminate, 12)
+void __attribute__ ((naked)) terminate(uint8_t *beneficary_ptr)
+    POLKAVM_ECALLI_TRAMPOLINE(void, terminate, 12, uint32_t)
 
 void __attribute__ ((naked)) input(uint8_t *out_ptr, uint32_t *out_len_ptr) 
     POLKAVM_ECALLI_TRAMPOLINE(void, input, 13, uint32_t, uint32_t)
