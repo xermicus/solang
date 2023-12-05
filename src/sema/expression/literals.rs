@@ -321,6 +321,14 @@ pub(crate) fn number_literal(
     diagnostics: &mut Diagnostics,
     resolve_to: ResolveTo,
 ) -> Result<Expression, ()> {
+    if integer.starts_with('0') && integer.len() > 1 {
+        diagnostics.push(Diagnostic::error(
+            *loc,
+            "leading zeros not permitted, can be confused with octal".into(),
+        ));
+        return Err(());
+    }
+
     let integer = BigInt::from_str(integer).unwrap();
 
     let n = if exp.is_empty() {
@@ -373,6 +381,16 @@ pub(super) fn rational_number_literal(
     diagnostics: &mut Diagnostics,
     resolve_to: ResolveTo,
 ) -> Result<Expression, ()> {
+    if integer.starts_with("-0") && integer.len() > 2
+        || integer.starts_with('0') && integer.len() > 1
+    {
+        diagnostics.push(Diagnostic::error(
+            *loc,
+            "leading zeros not permitted, can be confused with octal".into(),
+        ));
+        return Err(());
+    }
+
     let mut integer = integer.to_owned();
     let len = fraction.len() as u32;
     let exp_negative = exp.starts_with('-');
@@ -826,7 +844,7 @@ fn check_subarrays<'a>(
     flatten: &mut Vec<&'a pt::Expression>,
     diagnostics: &mut Diagnostics,
 ) -> Result<(), ()> {
-    if let Some(pt::Expression::ArrayLiteral(_, first)) = exprs.get(0) {
+    if let Some(pt::Expression::ArrayLiteral(_, first)) = exprs.first() {
         // ensure all elements are array literals of the same length
         check_subarrays(first, dims, flatten, diagnostics)?;
 
