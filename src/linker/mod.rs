@@ -17,11 +17,10 @@ pub fn link(input: &[u8], name: &str, target: Target) -> Vec<u8> {
     // We should fix this one day
     let _lock = LINKER_MUTEX.lock().unwrap();
 
-    if target == Target::Solana {
-        bpf::link(input, name)
-    } else {
-        //wasm::link(input, name)
-        rv::link(input, name)
+    match target {
+        Target::Solana => bpf::link(input, name),
+        Target::Polkadot { riscv: true, .. } => rv::link(input, name),
+        _ => wasm::link(input, name),
     }
 }
 

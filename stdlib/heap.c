@@ -39,14 +39,15 @@ void __init_heap()
     first->length = (32 * 1024) - sizeof(struct chunk);
 }
 #else
-#define HEAP_START ((struct chunk *)0x300000000)
+
+#define HEAP_START ((struct chunk *)0x10000)
 
 void __init_heap()
 {
     struct chunk *first = HEAP_START;
     first->next = first->prev = NULL;
     first->allocated = false;
-    first->length = (32 * 1024) - sizeof(struct chunk);
+    first->length = (uint32_t)(__builtin_wasm_memory_size(0) * 0x10000 - (size_t)first - sizeof(struct chunk));
 }
 #endif
 

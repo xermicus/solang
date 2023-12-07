@@ -39,6 +39,7 @@ impl Namespace {
             Target::Polkadot {
                 address_length,
                 value_length,
+                ..
             } => (address_length, value_length),
             Target::Solana => (32, 8),
         };

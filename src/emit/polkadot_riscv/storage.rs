@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::emit::binary::Binary;
-use crate::emit::polkadot::{log_return_code, PolkadotTarget};
+use crate::emit::polkadot_riscv::{log_return_code, PolkadotTarget};
 use crate::emit::storage::StorageSlot;
 use crate::emit::TargetRuntime;
 use crate::emit_context;
@@ -181,7 +181,7 @@ impl StorageSlot for PolkadotTarget {
                         "size_of",
                     );
                     let init = bin.builder.build_int_to_ptr(
-                        bin.context.i32_type().const_all_ones(),
+                        bin.context.i32_type().const_zero(),
                         bin.context.i8_type().ptr_type(AddressSpace::default()),
                         "invalid",
                     );

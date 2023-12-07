@@ -277,7 +277,7 @@ pub struct TargetArg {
 
 #[derive(Args, Deserialize, Debug, PartialEq)]
 pub struct CompileTargetArg {
-    #[arg(name = "TARGET", long = "target", value_parser = ["solana", "polkadot", "evm"], help = "Target to build for [possible values: solana, polkadot]", num_args = 1, hide_possible_values = true)]
+    #[arg(name = "TARGET", long = "target", value_parser = ["solana", "polkadot", "polkadot-riscv", "evm"], help = "Target to build for [possible values: solana, polkadot]", num_args = 1, hide_possible_values = true)]
     pub name: Option<String>,
 
     #[arg(name = "ADDRESS_LENGTH", help = "Address length on the Polkadot Parachain", long = "address-length", num_args = 1, value_parser = value_parser!(u64).range(4..1024))]
@@ -458,9 +458,15 @@ pub(crate) fn target_arg<T: TargetArgTrait>(target_arg: &T) -> Target {
 
     let target = match target_name.as_str() {
         "solana" => solang::Target::Solana,
+        "polkadot-riscv" => solang::Target::Polkadot {
+            address_length: target_arg.get_address_length().unwrap_or(32) as usize,
+            value_length: target_arg.get_value_length().unwrap_or(16) as usize,
+            riscv: true,
+        },
         "polkadot" => solang::Target::Polkadot {
             address_length: target_arg.get_address_length().unwrap_or(32) as usize,
             value_length: target_arg.get_value_length().unwrap_or(16) as usize,
+            riscv: false,
         },
         "evm" => solang::Target::EVM,
         _ => unreachable!(),

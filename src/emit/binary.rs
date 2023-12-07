@@ -18,7 +18,7 @@ use tempfile::tempdir;
 use wasm_opt::OptimizationOptions;
 
 use crate::codegen::{cfg::ReturnCode, Options};
-use crate::emit::{polkadot, TargetRuntime};
+use crate::emit::{polkadot, polkadot_riscv, TargetRuntime};
 use crate::emit::{solana, BinaryOp, Generate};
 use crate::linker::link;
 use crate::Target;
@@ -179,7 +179,10 @@ impl<'a> Binary<'a> {
     ) -> Self {
         let std_lib = load_stdlib(context, &ns.target);
         match ns.target {
-            Target::Polkadot { .. } => {
+            Target::Polkadot { riscv: true, .. } => {
+                polkadot_riscv::PolkadotTarget::build(context, &std_lib, contract, ns, opt)
+            }
+            Target::Polkadot { riscv: false, .. } => {
                 polkadot::PolkadotTarget::build(context, &std_lib, contract, ns, opt)
             }
             Target::Solana => solana::SolanaTarget::build(context, &std_lib, contract, ns, opt),
@@ -212,14 +215,19 @@ impl<'a> Binary<'a> {
         }
 
         let target = inkwell::targets::Target::from_name(self.target.llvm_target_name()).unwrap();
+        let riscv = matches!(self.target, Target::Polkadot { riscv: true, .. });
 
         let target_machine = target
             .create_target_machine(
                 &self.target.llvm_target_triple(),
-                "generic-rv32",
+                if riscv { "generic-rv32" } else { "" },
                 self.target.llvm_features(),
                 self.options.opt_level.into(),
-                RelocMode::PIC,
+                if riscv {
+                    RelocMode::PIC
+                } else {
+                    RelocMode::Default
+                },
                 CodeModel::Default,
             )
             .unwrap();
@@ -245,22 +253,24 @@ impl<'a> Binary<'a> {
             .map_err(|s| s.to_string())?;
 
         #[cfg(feature = "wasm_opt")]
-        if let Some(level) = self.options.wasm_opt.filter(|_| self.target.is_polkadot()) {
-            let mut infile = tempdir().map_err(|e| e.to_string())?.into_path();
-            infile.push("code.wasm");
-            let outfile = infile.with_extension("wasmopt");
-            std::fs::write(&infile, &code).map_err(|e| e.to_string())?;
+        if !riscv {
+            if let Some(level) = self.options.wasm_opt.filter(|_| self.target.is_polkadot()) {
+                let mut infile = tempdir().map_err(|e| e.to_string())?.into_path();
+                infile.push("code.wasm");
+                let outfile = infile.with_extension("wasmopt");
+                std::fs::write(&infile, &code).map_err(|e| e.to_string())?;
 
-            // Using the same config as cargo contract:
-            // https://github.com/paritytech/cargo-contract/blob/71a8a42096e2df36d54a695d099aecfb1e394b78/crates/build/src/wasm_opt.rs#L67
-            OptimizationOptions::from(level)
-                .mvp_features_only()
-                .zero_filled_memory(true)
-                .debug_info(self.options.generate_debug_information)
-                .run(&infile, &outfile)
-                .map_err(|err| format!("wasm-opt for binary {} failed: {}", self.name, err))?;
+                // Using the same config as cargo contract:
+                // https://github.com/paritytech/cargo-contract/blob/71a8a42096e2df36d54a695d099aecfb1e394b78/crates/build/src/wasm_opt.rs#L67
+                OptimizationOptions::from(level)
+                    .mvp_features_only()
+                    .zero_filled_memory(true)
+                    .debug_info(self.options.generate_debug_information)
+                    .run(&infile, &outfile)
+                    .map_err(|err| format!("wasm-opt for binary {} failed: {}", self.name, err))?;
 
-            return std::fs::read(&outfile).map_err(|e| e.to_string());
+                return std::fs::read(&outfile).map_err(|e| e.to_string());
+            }
         }
 
         Ok(code)
@@ -324,9 +334,13 @@ impl<'a> Binary<'a> {
         std_lib: &Module<'a>,
         runtime: Option<Box<Binary<'a>>>,
     ) -> Self {
+        let riscv = matches!(target, Target::Polkadot { riscv: true, .. });
         LLVM_INIT.get_or_init(|| {
-            //inkwell::targets::Target::initialize_webassembly(&Default::default());
-            inkwell::targets::Target::initialize_riscv(&Default::default());
+            if riscv {
+                inkwell::targets::Target::initialize_riscv(&Default::default());
+            } else {
+                inkwell::targets::Target::initialize_webassembly(&Default::default());
+            }
 
             #[cfg(feature = "solana")]
             {
@@ -351,18 +365,20 @@ impl<'a> Binary<'a> {
         let triple = target.llvm_target_triple();
         let module = context.create_module(name);
 
-        let pie_large = context.i32_type().const_int(2, false);
-        let pic_big = context.i32_type().const_int(2, false);
-        module.add_basic_value_flag(
-            "PIE Level",
-            inkwell::module::FlagBehavior::Override,
-            pie_large,
-        );
-        module.add_basic_value_flag(
-            "PIC Level",
-            inkwell::module::FlagBehavior::Override,
-            pic_big,
-        );
+        if riscv {
+            let pie_large = context.i32_type().const_int(2, false);
+            module.add_basic_value_flag(
+                "PIE Level",
+                inkwell::module::FlagBehavior::Override,
+                pie_large,
+            );
+            let pic_big = context.i32_type().const_int(2, false);
+            module.add_basic_value_flag(
+                "PIC Level",
+                inkwell::module::FlagBehavior::Override,
+                pic_big,
+            );
+        }
 
         let debug_metadata_version = context.i32_type().const_int(3, false);
         module.add_basic_value_flag(
@@ -394,9 +410,11 @@ impl<'a> Binary<'a> {
         module.set_source_file_name(filename);
 
         module.link_in_module(std_lib.clone()).unwrap();
-        let (pvm_call, pvm_deploy) = pvm_exports(&context);
-        module.link_in_module(pvm_call.clone()).unwrap();
-        module.link_in_module(pvm_deploy.clone()).unwrap();
+        if riscv {
+            let (pvm_call, pvm_deploy) = pvm_exports(&context);
+            module.link_in_module(pvm_call.clone()).unwrap();
+            module.link_in_module(pvm_deploy.clone()).unwrap();
+        }
 
         let selector = module.add_global(
             context.i32_type(),
@@ -1248,17 +1266,39 @@ fn load_stdlib<'a>(context: &'a Context, target: &Target) -> Module<'a> {
         return module;
     }
 
-    let memory = MemoryBuffer::create_from_memory_range(RISCV_IR[0], "wasm_bc");
+    if let Target::Polkadot { riscv: true, .. } = target {
+        let memory = MemoryBuffer::create_from_memory_range(RISCV_IR[0], "riscv_bc");
+
+        let module = Module::parse_bitcode_from_buffer(&memory, context).unwrap();
+
+        for bc in RISCV_IR.iter().skip(1) {
+            let memory = MemoryBuffer::create_from_memory_range(bc, "riscv_bc");
+
+            module
+                .link_in_module(Module::parse_bitcode_from_buffer(&memory, context).unwrap())
+                .unwrap();
+        }
+
+        return module;
+    }
+
+    let memory = MemoryBuffer::create_from_memory_range(WASM_IR[0], "wasm_bc");
 
     let module = Module::parse_bitcode_from_buffer(&memory, context).unwrap();
 
-    for bc in RISCV_IR.iter().skip(1) {
+    for bc in WASM_IR.iter().skip(1) {
         let memory = MemoryBuffer::create_from_memory_range(bc, "wasm_bc");
 
         module
             .link_in_module(Module::parse_bitcode_from_buffer(&memory, context).unwrap())
             .unwrap();
     }
+
+    let memory = MemoryBuffer::create_from_memory_range(RIPEMD160_IR, "ripemd160");
+
+    module
+        .link_in_module(Module::parse_bitcode_from_buffer(&memory, context).unwrap())
+        .unwrap();
 
     module
 }
@@ -1289,7 +1329,7 @@ static RISCV_IR: [&[u8]; 6] = [
     include_bytes!("../../target/riscv/ripemd160.bc"),
 ];
 
-static WASM_RIPEMD160_IR: &[u8] = include_bytes!("../../target/wasm/ripemd160.bc");
+static RIPEMD160_IR: &[u8] = include_bytes!("../../target/wasm/ripemd160.bc");
 
 pub(super) fn pvm_exports<'a>(ctx: &'a Context) -> (Module<'a>, Module<'a>) {
     let call_m = ctx.create_module("pvm_call");

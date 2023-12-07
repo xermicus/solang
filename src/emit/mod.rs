@@ -22,6 +22,7 @@ mod instructions;
 mod loop_builder;
 mod math;
 pub mod polkadot;
+pub mod polkadot_riscv;
 pub mod solana;
 mod storage;
 mod strings;
@@ -332,28 +333,28 @@ pub enum Generate {
 impl Target {
     /// LLVM Target name
     fn llvm_target_name(&self) -> &'static str {
-        if *self == Target::Solana {
-            "sbf"
-        } else {
-            "riscv32"
+        match self {
+            Target::Solana => "sbf",
+            Target::Polkadot { riscv: true, .. } => "riscv32",
+            _ => "wasm32",
         }
     }
 
     /// LLVM Target triple
     fn llvm_target_triple(&self) -> TargetTriple {
-        TargetTriple::create(if *self == Target::Solana {
-            "sbf-unknown-unknown"
-        } else {
-            "riscv32-unknown-none-elf"
+        TargetTriple::create(match self {
+            Target::Solana => "sbf-unknown-unknown",
+            Target::Polkadot { riscv: true, .. } => "riscv32-unknown-unknown-elf",
+            _ => "wasm32-unknown-unknown-wasm",
         })
     }
 
     /// LLVM Target triple
     fn llvm_features(&self) -> &'static str {
-        if *self == Target::Solana {
-            "+solana"
-        } else {
-            "+e,+m"
+        match self {
+            Target::Solana => "+solana",
+            Target::Polkadot { riscv: true, .. } => "+e,+m",
+            _ => "",
         }
     }
 }
