@@ -403,7 +403,7 @@ impl<'a> Binary<'a> {
 
         module.link_in_module(std_lib.clone()).unwrap();
         if riscv {
-            let (pvm_call, pvm_deploy) = pvm_exports(&context);
+            let (pvm_call, pvm_deploy) = pvm_exports(context);
             module.link_in_module(pvm_call.clone()).unwrap();
             module.link_in_module(pvm_deploy.clone()).unwrap();
         }
@@ -1323,7 +1323,7 @@ static RISCV_IR: [&[u8]; 6] = [
 
 static RIPEMD160_IR: &[u8] = include_bytes!("../../target/wasm/ripemd160.bc");
 
-pub(super) fn pvm_exports<'a>(ctx: &'a Context) -> (Module<'a>, Module<'a>) {
+pub(super) fn pvm_exports(ctx: &Context) -> (Module, Module) {
     let call_m = ctx.create_module("pvm_call");
     let deploy_m = ctx.create_module("pvm_deploy");
 

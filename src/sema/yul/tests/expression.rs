@@ -1693,6 +1693,7 @@ contract foo {
         Target::Polkadot {
             address_length: 32,
             value_length: 16,
+            riscv: false,
         },
     );
 
