@@ -139,6 +139,7 @@ typedef union {
     };
 } two64s;
 
+#ifndef __riscv
 // This assumes r >= 0 && r <= 127
 __uint128_t __ashlti3(__uint128_t val, int r)
 {
@@ -169,7 +170,6 @@ __uint128_t __ashlti3(__uint128_t val, int r)
 }
 
 // This assumes r >= 0 && r <= 127
-#ifndef __riscv
 __uint128_t __lshrti3(__uint128_t val, int r)
 {
     two64 in;

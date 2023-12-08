@@ -1,4 +1,4 @@
-CC=/opt/clang-rv32e/bin/clang
+CC=clang
 BIT_INT_FLAGS=-Xclang -fexperimental-max-bitint-width=512
 CFLAGS=$(TARGET_FLAGS) -emit-llvm -O3 -ffreestanding -fno-builtin -Wall -Wno-unused-function $(BIT_INT_FLAGS)
 

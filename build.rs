@@ -39,6 +39,11 @@ fn main() {
             .unwrap();
         let libdir = String::from_utf8(libdir.stdout).unwrap();
 
+        let compiler_rt = std::path::PathBuf::from(libdir.trim())
+            .join("linux")
+            .join("libclang_rt.builtins-riscv32.a");
+        std::fs::copy(compiler_rt, "target/riscv/libclang_rt.builtins-riscv32.a").unwrap();
+
         println!("cargo:libdir={libdir}");
         for lib in &["lldELF", "lldCommon", "lldWasm"] {
             println!("cargo:rustc-link-lib=static={lib}");

@@ -9,6 +9,7 @@ pub fn link(input: &[u8], name: &str) -> Vec<u8> {
     let object_filename = dir.path().join(name).with_extension("o");
     let res_filename = dir.path().join(name).with_extension("so");
     let linker_script_filename = dir.path().join("linker.ld");
+    let compiler_rt_path = dir.path().join("libclang_rt.builtins-riscv32.a");
 
     std::fs::write(&object_filename, input).expect("failed to write object file to temp file");
 
@@ -33,6 +34,10 @@ pub fn link(input: &[u8], name: &str) -> Vec<u8> {
     std::fs::write(&linker_script_filename, linker_script)
         .expect("failed to write linker script to temp file");
 
+    let compiler_rt = include_bytes!("../../target/riscv/libclang_rt.builtins-riscv32.a");
+    std::fs::write(compiler_rt_path, compiler_rt)
+        .expect("failed to write compiler builtins to temp file");
+
     let ld_args = [
         "--error-limit=0",
         "--relocatable",
@@ -40,7 +45,7 @@ pub fn link(input: &[u8], name: &str) -> Vec<u8> {
         "--no-relax",
         "--gc-sections",
         "--library-path",
-        "/opt/clang-rv32e/lib/linux",
+        dir.path().to_str().expect("should be unicode"),
         "--library",
         "clang_rt.builtins-riscv32",
         linker_script_filename.to_str().expect("should be unicode"),
@@ -57,7 +62,6 @@ pub fn link(input: &[u8], name: &str) -> Vec<u8> {
     let mut config = polkavm_linker::Config::default();
     config.set_strip(true);
     let code = std::fs::read(&res_filename).unwrap();
-    //std::fs::write("/home/cyrill/mess/solang/out.so", &code).unwrap();
     let output = match polkavm_linker::program_from_elf(config, &code) {
         Ok(blob) => blob.as_bytes().to_vec(),
         Err(reason) => panic!("polkavm linker failed: {}", reason),
