@@ -21,10 +21,7 @@ pub fn link(input: &[u8], name: &str, target: Target) -> Vec<u8> {
     match target {
         Target::Solana => bpf::link(input, name),
         Target::Polkadot { riscv: true, .. } => rv::link(input, name),
-        Target::Polkadot {
-            address_length: _,
-            value_length: _,
-        } => polkadot_wasm::link(input, name),
+        Target::Polkadot { .. } => polkadot_wasm::link(input, name),
         Target::Soroban => soroban_wasm::link(input, name),
         _ => panic!("linker not implemented for target {:?}", target),
     }

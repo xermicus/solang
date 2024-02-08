@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::emit::binary::Binary;
-use crate::emit::polkadot_riscv::{log_return_code, PolkadotTarget};
+use crate::emit::polkadot_riscv::PolkadotTarget;
 use crate::emit::storage::StorageSlot;
 use crate::emit::TargetRuntime;
 use crate::emit_context;
@@ -35,14 +35,12 @@ impl StorageSlot for PolkadotTarget {
                 .const_cast(binary.context.i32_type(), false)
         };
 
-        let ret = seal_set_storage!(
+        seal_set_storage!(
             slot.into(),
             i32_const!(32).into(),
             dest.into(),
             dest_size.into()
         );
-
-        log_return_code(binary, "seal_set_storage", ret);
     }
 
     fn get_storage_address<'a>(
@@ -57,7 +55,8 @@ impl StorageSlot for PolkadotTarget {
 
         binary
             .builder
-            .build_store(scratch_len, i32_const!(ns.address_length as u64));
+            .build_store(scratch_len, i32_const!(ns.address_length as u64))
+            .unwrap();
 
         let exists = seal_get_storage!(
             slot.into(),
@@ -66,14 +65,10 @@ impl StorageSlot for PolkadotTarget {
             scratch_len.into()
         );
 
-        log_return_code(binary, "seal_get_storage", exists);
-
-        let exists = binary.builder.build_int_compare(
-            IntPredicate::EQ,
-            exists,
-            i32_zero!(),
-            "storage_exists",
-        );
+        let exists = binary
+            .builder
+            .build_int_compare(IntPredicate::EQ, exists, i32_zero!(), "storage_exists")
+            .unwrap();
 
         binary
             .builder
@@ -82,23 +77,22 @@ impl StorageSlot for PolkadotTarget {
                 binary
                     .builder
                     .build_load(binary.address_type(ns), scratch_buf, "address")
+                    .unwrap()
                     .into_array_value(),
                 binary.address_type(ns).const_zero(),
                 "retrieved_address",
             )
+            .unwrap()
             .into_array_value()
     }
 
     fn storage_delete_single_slot(&self, binary: &Binary, slot: PointerValue) {
         emit_context!(binary);
 
-        let ret = call!("clear_storage", &[slot.into(), i32_const!(32).into()])
+        call!("clear_storage", &[slot.into(), i32_const!(32).into()])
             .try_as_basic_value()
             .left()
-            .unwrap()
-            .into_int_value();
-
-        log_return_code(binary, "seal_clear_storage", ret);
+            .unwrap();
     }
 
     fn storage_load_slot<'a>(
@@ -118,11 +112,14 @@ impl StorageSlot for PolkadotTarget {
                 if let Some(ArrayLength::Fixed(d)) = dim.last() {
                     let llvm_ty = bin.llvm_type(ty.deref_any(), ns);
                     // LLVMSizeOf() produces an i64
-                    let size = bin.builder.build_int_truncate(
-                        llvm_ty.size_of().unwrap(),
-                        bin.context.i32_type(),
-                        "size_of",
-                    );
+                    let size = bin
+                        .builder
+                        .build_int_truncate(
+                            llvm_ty.size_of().unwrap(),
+                            bin.context.i32_type(),
+                            "size_of",
+                        )
+                        .unwrap();
 
                     let ty = ty.array_deref();
                     let new = call!("__malloc", &[size.into()])
@@ -138,12 +135,9 @@ impl StorageSlot for PolkadotTarget {
                         slot,
                         |index: IntValue<'a>, slot: &mut IntValue<'a>| {
                             let elem = unsafe {
-                                bin.builder.build_gep(
-                                    llvm_ty,
-                                    new,
-                                    &[i32_zero!(), index],
-                                    "index_access",
-                                )
+                                bin.builder
+                                    .build_gep(llvm_ty, new, &[i32_zero!(), index], "index_access")
+                                    .unwrap()
                             };
 
                             let val =
@@ -153,11 +147,12 @@ impl StorageSlot for PolkadotTarget {
                                 let load_ty = bin.llvm_type(ty.deref_any(), ns);
                                 bin.builder
                                     .build_load(load_ty, val.into_pointer_value(), "elem")
+                                    .unwrap()
                             } else {
                                 val
                             };
 
-                            bin.builder.build_store(elem, val);
+                            bin.builder.build_store(elem, val).unwrap();
                         },
                     );
 
@@ -166,25 +161,34 @@ impl StorageSlot for PolkadotTarget {
                     // iterate over dynamic array
                     let slot_ty = Type::Uint(256);
 
-                    let size = bin.builder.build_int_truncate(
-                        self.storage_load_slot(bin, &slot_ty, slot, slot_ptr, function, ns)
-                            .into_int_value(),
-                        bin.context.i32_type(),
-                        "size",
-                    );
+                    let size = bin
+                        .builder
+                        .build_int_truncate(
+                            self.storage_load_slot(bin, &slot_ty, slot, slot_ptr, function, ns)
+                                .into_int_value(),
+                            bin.context.i32_type(),
+                            "size",
+                        )
+                        .unwrap();
 
                     let llvm_elem_ty = bin.llvm_field_ty(elem_ty, ns);
 
-                    let elem_size = bin.builder.build_int_truncate(
-                        llvm_elem_ty.size_of().unwrap(),
-                        bin.context.i32_type(),
-                        "size_of",
-                    );
-                    let init = bin.builder.build_int_to_ptr(
-                        bin.context.i32_type().const_zero(),
-                        bin.context.i8_type().ptr_type(AddressSpace::default()),
-                        "invalid",
-                    );
+                    let elem_size = bin
+                        .builder
+                        .build_int_truncate(
+                            llvm_elem_ty.size_of().unwrap(),
+                            bin.context.i32_type(),
+                            "size_of",
+                        )
+                        .unwrap();
+                    let init = bin
+                        .builder
+                        .build_int_to_ptr(
+                            bin.context.i32_type().const_zero(),
+                            bin.context.i8_type().ptr_type(AddressSpace::default()),
+                            "invalid",
+                        )
+                        .unwrap();
 
                     let dest = call!("vector_new", &[size.into(), elem_size.into(), init.into()])
                         .try_as_basic_value()
@@ -207,6 +211,7 @@ impl StorageSlot for PolkadotTarget {
                     let mut elem_slot = bin
                         .builder
                         .build_load(slot.get_type(), slot_ptr, "elem_slot")
+                        .unwrap()
                         .into_int_value();
 
                     bin.emit_loop_cond_first_with_int(
@@ -221,16 +226,18 @@ impl StorageSlot for PolkadotTarget {
                                 self.storage_load_slot(bin, elem_ty, slot, slot_ptr, function, ns);
 
                             let entry = if elem_ty.deref_memory().is_fixed_reference_type(ns) {
-                                bin.builder.build_load(
-                                    bin.llvm_type(elem_ty.deref_memory(), ns),
-                                    entry.into_pointer_value(),
-                                    "elem",
-                                )
+                                bin.builder
+                                    .build_load(
+                                        bin.llvm_type(elem_ty.deref_memory(), ns),
+                                        entry.into_pointer_value(),
+                                        "elem",
+                                    )
+                                    .unwrap()
                             } else {
                                 entry
                             };
 
-                            bin.builder.build_store(elem, entry);
+                            bin.builder.build_store(elem, entry).unwrap();
                         },
                     );
                     // load
@@ -240,11 +247,14 @@ impl StorageSlot for PolkadotTarget {
             Type::Struct(str_ty) => {
                 let llvm_ty = bin.llvm_type(ty.deref_any(), ns);
                 // LLVMSizeOf() produces an i64
-                let size = bin.builder.build_int_truncate(
-                    llvm_ty.size_of().unwrap(),
-                    bin.context.i32_type(),
-                    "size_of",
-                );
+                let size = bin
+                    .builder
+                    .build_int_truncate(
+                        llvm_ty.size_of().unwrap(),
+                        bin.context.i32_type(),
+                        "size_of",
+                    )
+                    .unwrap();
 
                 let new = call!("__malloc", &[size.into()])
                     .try_as_basic_value()
@@ -256,45 +266,44 @@ impl StorageSlot for PolkadotTarget {
                     let val = self.storage_load_slot(bin, &field.ty, slot, slot_ptr, function, ns);
 
                     let elem = unsafe {
-                        bin.builder.build_gep(
-                            llvm_ty,
-                            new,
-                            &[i32_zero!(), i32_const!(i as u64)],
-                            field.name_as_str(),
-                        )
+                        bin.builder
+                            .build_gep(
+                                llvm_ty,
+                                new,
+                                &[i32_zero!(), i32_const!(i as u64)],
+                                field.name_as_str(),
+                            )
+                            .unwrap()
                     };
 
                     let val = if field.ty.deref_memory().is_fixed_reference_type(ns) {
                         let load_ty = bin.llvm_type(field.ty.deref_memory(), ns);
-                        bin.builder.build_load(
-                            load_ty,
-                            val.into_pointer_value(),
-                            field.name_as_str(),
-                        )
+                        bin.builder
+                            .build_load(load_ty, val.into_pointer_value(), field.name_as_str())
+                            .unwrap()
                     } else {
                         val
                     };
 
-                    bin.builder.build_store(elem, val);
+                    bin.builder.build_store(elem, val).unwrap();
                 }
 
                 new.into()
             }
             Type::String | Type::DynamicBytes => {
-                bin.builder.build_store(slot_ptr, *slot);
+                bin.builder.build_store(slot_ptr, *slot).unwrap();
 
                 let ret = self.get_storage_string(bin, function, slot_ptr);
 
-                *slot = bin.builder.build_int_add(
-                    *slot,
-                    bin.number_literal(256, &BigInt::one(), ns),
-                    "string",
-                );
+                *slot = bin
+                    .builder
+                    .build_int_add(*slot, bin.number_literal(256, &BigInt::one(), ns), "string")
+                    .unwrap();
 
                 ret.into()
             }
             Type::InternalFunction { .. } => {
-                bin.builder.build_store(slot_ptr, *slot);
+                bin.builder.build_store(slot_ptr, *slot).unwrap();
 
                 let ptr_ty = bin
                     .context
@@ -309,36 +318,35 @@ impl StorageSlot for PolkadotTarget {
                             .ptr_type(AddressSpace::default()),
                         "",
                     )
+                    .unwrap()
                     .into()
             }
             Type::ExternalFunction { .. } => {
-                bin.builder.build_store(slot_ptr, *slot);
+                bin.builder.build_store(slot_ptr, *slot).unwrap();
 
                 let ret = self.get_storage_extfunc(bin, function, slot_ptr, ns);
 
-                *slot = bin.builder.build_int_add(
-                    *slot,
-                    bin.number_literal(256, &BigInt::one(), ns),
-                    "string",
-                );
+                *slot = bin
+                    .builder
+                    .build_int_add(*slot, bin.number_literal(256, &BigInt::one(), ns), "string")
+                    .unwrap();
 
                 ret.into()
             }
             Type::Address(_) | Type::Contract(_) => {
-                bin.builder.build_store(slot_ptr, *slot);
+                bin.builder.build_store(slot_ptr, *slot).unwrap();
 
                 let ret = self.get_storage_address(bin, slot_ptr, ns);
 
-                *slot = bin.builder.build_int_add(
-                    *slot,
-                    bin.number_literal(256, &BigInt::one(), ns),
-                    "string",
-                );
+                *slot = bin
+                    .builder
+                    .build_int_add(*slot, bin.number_literal(256, &BigInt::one(), ns), "string")
+                    .unwrap();
 
                 ret.into()
             }
             _ => {
-                bin.builder.build_store(slot_ptr, *slot);
+                bin.builder.build_store(slot_ptr, *slot).unwrap();
 
                 let ret = self.get_storage_int(
                     bin,
@@ -347,11 +355,10 @@ impl StorageSlot for PolkadotTarget {
                     bin.llvm_type(ty.deref_any(), ns).into_int_type(),
                 );
 
-                *slot = bin.builder.build_int_add(
-                    *slot,
-                    bin.number_literal(256, &BigInt::one(), ns),
-                    "int",
-                );
+                *slot = bin
+                    .builder
+                    .build_int_add(*slot, bin.number_literal(256, &BigInt::one(), ns), "int")
+                    .unwrap();
 
                 ret.into()
             }
@@ -378,12 +385,14 @@ impl StorageSlot for PolkadotTarget {
                         slot,
                         |index: IntValue<'a>, slot: &mut IntValue<'a>| {
                             let mut elem = unsafe {
-                                bin.builder.build_gep(
-                                    bin.llvm_type(ty.deref_any(), ns),
-                                    dest.into_pointer_value(),
-                                    &[bin.context.i32_type().const_zero(), index],
-                                    "index_access",
-                                )
+                                bin.builder
+                                    .build_gep(
+                                        bin.llvm_type(ty.deref_any(), ns),
+                                        dest.into_pointer_value(),
+                                        &[bin.context.i32_type().const_zero(), index],
+                                        "index_access",
+                                    )
+                                    .unwrap()
                             };
 
                             if elem_ty.is_reference_type(ns)
@@ -394,6 +403,7 @@ impl StorageSlot for PolkadotTarget {
                                 elem = bin
                                     .builder
                                     .build_load(load_ty, elem, "")
+                                    .unwrap()
                                     .into_pointer_value();
                             }
 
@@ -408,11 +418,14 @@ impl StorageSlot for PolkadotTarget {
                             );
 
                             if !elem_ty.is_reference_type(ns) {
-                                *slot = bin.builder.build_int_add(
-                                    *slot,
-                                    bin.number_literal(256, &elem_ty.storage_slots(ns), ns),
-                                    "",
-                                );
+                                *slot = bin
+                                    .builder
+                                    .build_int_add(
+                                        *slot,
+                                        bin.number_literal(256, &elem_ty.storage_slots(ns), ns),
+                                        "",
+                                    )
+                                    .unwrap();
                             }
                         },
                     );
@@ -424,34 +437,45 @@ impl StorageSlot for PolkadotTarget {
 
                     // details about our array elements
                     let llvm_elem_ty = bin.llvm_field_ty(elem_ty, ns);
-                    let elem_size = bin.builder.build_int_truncate(
-                        llvm_elem_ty.size_of().unwrap(),
-                        bin.context.i32_type(),
-                        "size_of",
-                    );
+                    let elem_size = bin
+                        .builder
+                        .build_int_truncate(
+                            llvm_elem_ty.size_of().unwrap(),
+                            bin.context.i32_type(),
+                            "size_of",
+                        )
+                        .unwrap();
 
                     // the previous length of the storage array
                     // we need this to clear any elements
-                    let previous_size = bin.builder.build_int_truncate(
-                        self.storage_load_slot(bin, &slot_ty, slot, slot_ptr, function, ns)
-                            .into_int_value(),
-                        bin.context.i32_type(),
-                        "previous_size",
-                    );
+                    let previous_size = bin
+                        .builder
+                        .build_int_truncate(
+                            self.storage_load_slot(bin, &slot_ty, slot, slot_ptr, function, ns)
+                                .into_int_value(),
+                            bin.context.i32_type(),
+                            "previous_size",
+                        )
+                        .unwrap();
 
                     let new_slot = bin
                         .builder
-                        .build_alloca(bin.llvm_type(&slot_ty, ns).into_int_type(), "new");
+                        .build_alloca(bin.llvm_type(&slot_ty, ns).into_int_type(), "new")
+                        .unwrap();
 
                     // set new length
-                    bin.builder.build_store(
-                        new_slot,
-                        bin.builder.build_int_z_extend(
-                            len,
-                            bin.llvm_type(&slot_ty, ns).into_int_type(),
-                            "",
-                        ),
-                    );
+                    bin.builder
+                        .build_store(
+                            new_slot,
+                            bin.builder
+                                .build_int_z_extend(
+                                    len,
+                                    bin.llvm_type(&slot_ty, ns).into_int_type(),
+                                    "",
+                                )
+                                .unwrap(),
+                        )
+                        .unwrap();
 
                     self.set_storage(bin, slot_ptr, new_slot, bin.llvm_type(&slot_ty, ns));
 
@@ -472,6 +496,7 @@ impl StorageSlot for PolkadotTarget {
                             new_slot,
                             "elem_slot",
                         )
+                        .unwrap()
                         .into_int_value();
 
                     bin.emit_loop_cond_first_with_int(
@@ -480,19 +505,21 @@ impl StorageSlot for PolkadotTarget {
                         len,
                         &mut elem_slot,
                         |elem_no: IntValue<'a>, slot: &mut IntValue<'a>| {
-                            let index = bin.builder.build_int_mul(elem_no, elem_size, "");
+                            let index = bin.builder.build_int_mul(elem_no, elem_size, "").unwrap();
 
                             let mut elem = unsafe {
-                                bin.builder.build_gep(
-                                    bin.llvm_type(ty.deref_any(), ns),
-                                    dest.into_pointer_value(),
-                                    &[
-                                        bin.context.i32_type().const_zero(),
-                                        bin.context.i32_type().const_int(2, false),
-                                        index,
-                                    ],
-                                    "data",
-                                )
+                                bin.builder
+                                    .build_gep(
+                                        bin.llvm_type(ty.deref_any(), ns),
+                                        dest.into_pointer_value(),
+                                        &[
+                                            bin.context.i32_type().const_zero(),
+                                            bin.context.i32_type().const_int(2, false),
+                                            index,
+                                        ],
+                                        "data",
+                                    )
+                                    .unwrap()
                             };
 
                             if elem_ty.is_reference_type(ns)
@@ -501,6 +528,7 @@ impl StorageSlot for PolkadotTarget {
                                 elem = bin
                                     .builder
                                     .build_load(llvm_elem_ty, elem, "")
+                                    .unwrap()
                                     .into_pointer_value();
                             }
 
@@ -515,11 +543,14 @@ impl StorageSlot for PolkadotTarget {
                             );
 
                             if !elem_ty.is_reference_type(ns) {
-                                *slot = bin.builder.build_int_add(
-                                    *slot,
-                                    bin.number_literal(256, &elem_ty.storage_slots(ns), ns),
-                                    "",
-                                );
+                                *slot = bin
+                                    .builder
+                                    .build_int_add(
+                                        *slot,
+                                        bin.number_literal(256, &elem_ty.storage_slots(ns), ns),
+                                        "",
+                                    )
+                                    .unwrap();
                             }
                         },
                     );
@@ -535,11 +566,14 @@ impl StorageSlot for PolkadotTarget {
                             self.storage_delete_slot(bin, elem_ty, slot, slot_ptr, function, ns);
 
                             if !elem_ty.is_reference_type(ns) {
-                                *slot = bin.builder.build_int_add(
-                                    *slot,
-                                    bin.number_literal(256, &elem_ty.storage_slots(ns), ns),
-                                    "",
-                                );
+                                *slot = bin
+                                    .builder
+                                    .build_int_add(
+                                        *slot,
+                                        bin.number_literal(256, &elem_ty.storage_slots(ns), ns),
+                                        "",
+                                    )
+                                    .unwrap();
                             }
                         },
                     );
@@ -548,15 +582,17 @@ impl StorageSlot for PolkadotTarget {
             Type::Struct(str_ty) => {
                 for (i, field) in str_ty.definition(ns).fields.iter().enumerate() {
                     let mut elem = unsafe {
-                        bin.builder.build_gep(
-                            bin.llvm_type(ty.deref_any(), ns),
-                            dest.into_pointer_value(),
-                            &[
-                                bin.context.i32_type().const_zero(),
-                                bin.context.i32_type().const_int(i as u64, false),
-                            ],
-                            field.name_as_str(),
-                        )
+                        bin.builder
+                            .build_gep(
+                                bin.llvm_type(ty.deref_any(), ns),
+                                dest.into_pointer_value(),
+                                &[
+                                    bin.context.i32_type().const_zero(),
+                                    bin.context.i32_type().const_int(i as u64, false),
+                                ],
+                                field.name_as_str(),
+                            )
+                            .unwrap()
                     };
 
                     if field.ty.is_reference_type(ns) && !field.ty.is_fixed_reference_type(ns) {
@@ -566,6 +602,7 @@ impl StorageSlot for PolkadotTarget {
                         elem = bin
                             .builder
                             .build_load(load_ty, elem, field.name_as_str())
+                            .unwrap()
                             .into_pointer_value();
                     }
 
@@ -582,21 +619,24 @@ impl StorageSlot for PolkadotTarget {
                     if !field.ty.is_reference_type(ns)
                         || matches!(field.ty, Type::String | Type::DynamicBytes)
                     {
-                        *slot = bin.builder.build_int_add(
-                            *slot,
-                            bin.number_literal(256, &field.ty.storage_slots(ns), ns),
-                            field.name_as_str(),
-                        );
+                        *slot = bin
+                            .builder
+                            .build_int_add(
+                                *slot,
+                                bin.number_literal(256, &field.ty.storage_slots(ns), ns),
+                                field.name_as_str(),
+                            )
+                            .unwrap();
                     }
                 }
             }
             Type::String | Type::DynamicBytes => {
-                bin.builder.build_store(slot_ptr, *slot);
+                bin.builder.build_store(slot_ptr, *slot).unwrap();
 
                 self.set_storage_string(bin, function, slot_ptr, dest);
             }
             Type::ExternalFunction { .. } => {
-                bin.builder.build_store(slot_ptr, *slot);
+                bin.builder.build_store(slot_ptr, *slot).unwrap();
 
                 self.set_storage_extfunc(
                     bin,
@@ -613,22 +653,22 @@ impl StorageSlot for PolkadotTarget {
 
                 let m = bin.build_alloca(function, ptr_ty, "");
 
-                bin.builder.build_store(
-                    m,
-                    bin.builder.build_ptr_to_int(
-                        dest.into_pointer_value(),
-                        ptr_ty,
-                        "function_pointer",
-                    ),
-                );
+                bin.builder
+                    .build_store(
+                        m,
+                        bin.builder
+                            .build_ptr_to_int(dest.into_pointer_value(), ptr_ty, "function_pointer")
+                            .unwrap(),
+                    )
+                    .unwrap();
 
-                bin.builder.build_store(slot_ptr, *slot);
+                bin.builder.build_store(slot_ptr, *slot).unwrap();
 
                 self.set_storage(bin, slot_ptr, m, ptr_ty.as_basic_type_enum());
             }
             Type::Address(_) | Type::Contract(_) => {
                 if dest.is_pointer_value() {
-                    bin.builder.build_store(slot_ptr, *slot);
+                    bin.builder.build_store(slot_ptr, *slot).unwrap();
 
                     self.set_storage(
                         bin,
@@ -637,11 +677,16 @@ impl StorageSlot for PolkadotTarget {
                         bin.llvm_type(ty, ns),
                     );
                 } else {
-                    let address = bin.builder.build_alloca(bin.address_type(ns), "address");
+                    let address = bin
+                        .builder
+                        .build_alloca(bin.address_type(ns), "address")
+                        .unwrap();
 
-                    bin.builder.build_store(address, dest.into_array_value());
+                    bin.builder
+                        .build_store(address, dest.into_array_value())
+                        .unwrap();
 
-                    bin.builder.build_store(slot_ptr, *slot);
+                    bin.builder.build_store(slot_ptr, *slot).unwrap();
 
                     self.set_storage(
                         bin,
@@ -652,11 +697,11 @@ impl StorageSlot for PolkadotTarget {
                 }
             }
             _ => {
-                bin.builder.build_store(slot_ptr, *slot);
+                bin.builder.build_store(slot_ptr, *slot).unwrap();
 
                 let dest = if dest.is_int_value() {
                     let m = bin.build_alloca(function, dest.get_type(), "");
-                    bin.builder.build_store(m, dest);
+                    bin.builder.build_store(m, dest).unwrap();
 
                     m
                 } else {
@@ -694,22 +739,25 @@ impl StorageSlot for PolkadotTarget {
                             self.storage_delete_slot(bin, &ty, slot, slot_ptr, function, ns);
 
                             if !ty.is_reference_type(ns) {
-                                *slot = bin.builder.build_int_add(
-                                    *slot,
-                                    bin.number_literal(256, &ty.storage_slots(ns), ns),
-                                    "",
-                                );
+                                *slot = bin
+                                    .builder
+                                    .build_int_add(
+                                        *slot,
+                                        bin.number_literal(256, &ty.storage_slots(ns), ns),
+                                        "",
+                                    )
+                                    .unwrap();
                             }
                         },
                     );
                 } else {
                     // dynamic length array.
                     // load length
-                    bin.builder.build_store(slot_ptr, *slot);
+                    bin.builder.build_store(slot_ptr, *slot).unwrap();
 
                     let slot_ty = bin.context.custom_width_int_type(256);
 
-                    let buf = bin.builder.build_alloca(slot_ty, "buf");
+                    let buf = bin.builder.build_alloca(slot_ty, "buf").unwrap();
 
                     let length = self.get_storage_int(bin, function, slot_ptr, slot_ty);
 
@@ -728,6 +776,7 @@ impl StorageSlot for PolkadotTarget {
                     let mut entry_slot = bin
                         .builder
                         .build_load(slot.get_type(), buf, "entry_slot")
+                        .unwrap()
                         .into_int_value();
 
                     // now loop from first slot to first slot + length
@@ -740,11 +789,14 @@ impl StorageSlot for PolkadotTarget {
                             self.storage_delete_slot(bin, &ty, slot, slot_ptr, function, ns);
 
                             if !ty.is_reference_type(ns) {
-                                *slot = bin.builder.build_int_add(
-                                    *slot,
-                                    bin.number_literal(256, &ty.storage_slots(ns), ns),
-                                    "",
-                                );
+                                *slot = bin
+                                    .builder
+                                    .build_int_add(
+                                        *slot,
+                                        bin.number_literal(256, &ty.storage_slots(ns), ns),
+                                        "",
+                                    )
+                                    .unwrap();
                             }
                         },
                     );
@@ -760,11 +812,14 @@ impl StorageSlot for PolkadotTarget {
                     if !field.ty.is_reference_type(ns)
                         || matches!(field.ty, Type::String | Type::DynamicBytes)
                     {
-                        *slot = bin.builder.build_int_add(
-                            *slot,
-                            bin.number_literal(256, &field.ty.storage_slots(ns), ns),
-                            field.name_as_str(),
-                        );
+                        *slot = bin
+                            .builder
+                            .build_int_add(
+                                *slot,
+                                bin.number_literal(256, &field.ty.storage_slots(ns), ns),
+                                field.name_as_str(),
+                            )
+                            .unwrap();
                     }
                 }
             }
@@ -772,7 +827,7 @@ impl StorageSlot for PolkadotTarget {
                 // nothing to do, step over it
             }
             _ => {
-                bin.builder.build_store(slot_ptr, *slot);
+                bin.builder.build_store(slot_ptr, *slot).unwrap();
 
                 self.storage_delete_single_slot(bin, slot_ptr);
             }
