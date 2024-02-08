@@ -172,7 +172,6 @@ impl VirtualMachineBuilder {
             Target::Solana,
             self.opts.as_ref().unwrap_or(&Options {
                 opt_level: OptimizationLevel::Default,
-                log_api_return_codes: false,
                 log_runtime_errors: true,
                 log_prints: true,
                 ..Default::default()
@@ -296,7 +295,6 @@ fn serialize_parameters(
     let mut refs = Vec::new();
     let mut v: Vec<u8> = Vec::new();
 
-    #[allow(clippy::ptr_arg)]
     fn serialize_account(
         v: &mut Vec<u8>,
         refs: &mut Vec<AccountRef>,

@@ -12,7 +12,6 @@ use inkwell::AddressSpace;
 use crate::codegen::dispatch::polkadot::DispatchType;
 use crate::emit::functions::emit_functions;
 use crate::emit::{Binary, TargetRuntime};
-use crate::emit_context;
 
 mod storage;
 pub(super) mod target;
@@ -41,11 +40,13 @@ impl PolkadotTarget {
             None,
         );
 
-        binary.vector_init_empty = binary.builder.build_int_to_ptr(
-            binary.context.i32_type().const_all_ones(),
-            binary.context.i8_type().ptr_type(AddressSpace::default()),
-            "empty_vector",
-        );
+        let ptr = binary.context.i8_type().ptr_type(AddressSpace::default());
+
+        binary.vector_init_empty = binary
+            .context
+            .i32_type()
+            .const_all_ones()
+            .const_to_pointer(ptr);
         binary.set_early_value_aborts(contract, ns);
 
         let scratch_len = binary.module.add_global(
@@ -125,6 +126,7 @@ impl PolkadotTarget {
             "__ashlti3",
             "__lshrti3",
             "__ashrti3",
+            "caller_is_root",
         ]);
 
         binary
@@ -143,41 +145,51 @@ impl PolkadotTarget {
         // init our heap
         binary
             .builder
-            .build_call(binary.module.get_function("__init_heap").unwrap(), &[], "");
+            .build_call(binary.module.get_function("__init_heap").unwrap(), &[], "")
+            .unwrap();
 
         // Call the storage initializers on deploy
         if let Some(initializer) = storage_initializer {
-            binary.builder.build_call(initializer, &[], "");
+            binary.builder.build_call(initializer, &[], "").unwrap();
         }
 
         let scratch_buf = binary.scratch.unwrap().as_pointer_value();
         let scratch_len = binary.scratch_len.unwrap().as_pointer_value();
 
         // copy arguments from input buffer
-        binary.builder.build_store(
-            scratch_len,
-            binary
-                .context
-                .i32_type()
-                .const_int(SCRATCH_SIZE as u64, false),
-        );
+        binary
+            .builder
+            .build_store(
+                scratch_len,
+                binary
+                    .context
+                    .i32_type()
+                    .const_int(SCRATCH_SIZE as u64, false),
+            )
+            .unwrap();
 
-        binary.builder.build_call(
-            binary.module.get_function("input").unwrap(),
-            &[scratch_buf.into(), scratch_len.into()],
-            "",
-        );
+        binary
+            .builder
+            .build_call(
+                binary.module.get_function("input").unwrap(),
+                &[scratch_buf.into(), scratch_len.into()],
+                "",
+            )
+            .unwrap();
 
-        let args_length =
-            binary
-                .builder
-                .build_load(binary.context.i32_type(), scratch_len, "input_len");
+        let args_length = binary
+            .builder
+            .build_load(binary.context.i32_type(), scratch_len, "input_len")
+            .unwrap();
 
         // store the length in case someone wants it via msg.data
-        binary.builder.build_store(
-            binary.calldata_len.as_pointer_value(),
-            args_length.into_int_value(),
-        );
+        binary
+            .builder
+            .build_store(
+                binary.calldata_len.as_pointer_value(),
+                args_length.into_int_value(),
+            )
+            .unwrap();
 
         (scratch_buf, args_length.into_int_value())
     }
@@ -273,6 +285,7 @@ impl PolkadotTarget {
         external!("deposit_event", void_type, u8_ptr, u32_val, u8_ptr, u32_val);
         external!("is_contract", i32_type, u8_ptr);
         external!("set_code_hash", i32_type, u8_ptr);
+        external!("caller_is_root", i32_type,);
     }
 
     /// Emits the "deploy" function if `storage_initializer` is `Some`, otherwise emits the "call" function.
@@ -301,79 +314,10 @@ impl PolkadotTarget {
             .unwrap_or(DispatchType::Call)
             .to_string();
         let cfg = bin.module.get_function(dispatch_cfg_name).unwrap();
-        bin.builder.build_call(cfg, &args, dispatch_cfg_name);
+        bin.builder
+            .build_call(cfg, &args, dispatch_cfg_name)
+            .unwrap();
 
-        bin.builder.build_unreachable();
+        bin.builder.build_unreachable().unwrap();
     }
-}
-
-/// Print the return code of API calls to the debug buffer.
-fn log_return_code(binary: &Binary, api: &'static str, code: IntValue) {
-    if !binary.options.log_api_return_codes {
-        return;
-    }
-
-    emit_context!(binary);
-
-    let fmt = format!("call: {api}=");
-    let msg = fmt.as_bytes();
-    let delimiter = b",\n";
-    let delimiter_length = delimiter.len();
-    let length = i32_const!(msg.len() as u64 + 16 + delimiter_length as u64);
-    let out_buf =
-        binary
-            .builder
-            .build_array_alloca(binary.context.i8_type(), length, "seal_ret_code_buf");
-    let mut out_buf_offset = out_buf;
-
-    let msg_string = binary.emit_global_string(&fmt, msg, true);
-    let msg_len = binary.context.i32_type().const_int(msg.len() as u64, false);
-    call!(
-        "__memcpy",
-        &[out_buf_offset.into(), msg_string.into(), msg_len.into()]
-    );
-    out_buf_offset = unsafe {
-        binary
-            .builder
-            .build_gep(binary.context.i8_type(), out_buf_offset, &[msg_len], "")
-    };
-
-    let code = binary
-        .builder
-        .build_int_z_extend(code, binary.context.i64_type(), "val_64bits");
-    out_buf_offset = call!("uint2dec", &[out_buf_offset.into(), code.into()])
-        .try_as_basic_value()
-        .left()
-        .unwrap()
-        .into_pointer_value();
-
-    let delimiter_string = binary.emit_global_string("delimiter", delimiter, true);
-    let lim_len = binary
-        .context
-        .i32_type()
-        .const_int(delimiter_length as u64, false);
-    call!(
-        "__memcpy",
-        &[
-            out_buf_offset.into(),
-            delimiter_string.into(),
-            lim_len.into()
-        ]
-    );
-    out_buf_offset = unsafe {
-        binary
-            .builder
-            .build_gep(binary.context.i8_type(), out_buf_offset, &[lim_len], "")
-    };
-
-    let msg_len = binary.builder.build_int_sub(
-        binary
-            .builder
-            .build_ptr_to_int(out_buf_offset, binary.context.i32_type(), "out_buf_idx"),
-        binary
-            .builder
-            .build_ptr_to_int(out_buf, binary.context.i32_type(), "out_buf_ptr"),
-        "msg_len",
-    );
-    call!("debug_message", &[out_buf.into(), msg_len.into()]);
 }

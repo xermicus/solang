@@ -24,6 +24,9 @@ mod math;
 pub mod polkadot;
 pub mod polkadot_riscv;
 pub mod solana;
+
+#[cfg(feature = "soroban")]
+pub mod soroban;
 mod storage;
 mod strings;
 
@@ -229,7 +232,7 @@ pub trait TargetRuntime<'a> {
         function: FunctionValue<'a>,
         builtin_func: &Function,
         args: &[BasicMetadataValueEnum<'a>],
-        first_arg_type: BasicTypeEnum,
+        first_arg_type: Option<BasicTypeEnum>,
         ns: &Namespace,
     ) -> Option<BasicValueEnum<'a>>;
 
@@ -367,12 +370,13 @@ impl ast::Contract {
         ns: &'a ast::Namespace,
         context: &'a inkwell::context::Context,
         opt: &'a Options,
+        contract_no: usize,
     ) -> binary::Binary {
-        binary::Binary::build(context, self, ns, opt)
+        binary::Binary::build(context, self, ns, opt, contract_no)
     }
 
     /// Generate the final program code for the contract
-    pub fn emit(&self, ns: &ast::Namespace, opt: &Options) -> Vec<u8> {
+    pub fn emit(&self, ns: &ast::Namespace, opt: &Options, contract_no: usize) -> Vec<u8> {
         if ns.target == Target::EVM {
             return vec![];
         }
@@ -380,7 +384,7 @@ impl ast::Contract {
         self.code
             .get_or_init(move || {
                 let context = inkwell::context::Context::create();
-                let binary = self.binary(ns, &context, opt);
+                let binary = self.binary(ns, &context, opt, contract_no);
                 binary.code(Generate::Linked).expect("llvm build")
             })
             .to_vec()

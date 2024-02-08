@@ -160,7 +160,7 @@ pub struct StructDecl {
     pub id: pt::Identifier,
     pub loc: pt::Loc,
     pub contract: Option<String>,
-    pub fields: Vec<Parameter>,
+    pub fields: Vec<Parameter<Type>>,
     // List of offsets of the fields, last entry is the offset for the struct overall size
     pub offsets: Vec<BigInt>,
     // Same, but now in storage
@@ -173,7 +173,7 @@ pub struct EventDecl {
     pub id: pt::Identifier,
     pub loc: pt::Loc,
     pub contract: Option<usize>,
-    pub fields: Vec<Parameter>,
+    pub fields: Vec<Parameter<Type>>,
     pub signature: String,
     pub anonymous: bool,
     pub used: bool,
@@ -194,7 +194,7 @@ pub struct ErrorDecl {
     pub name: String,
     pub loc: pt::Loc,
     pub contract: Option<usize>,
-    pub fields: Vec<Parameter>,
+    pub fields: Vec<Parameter<Type>>,
     pub used: bool,
 }
 
@@ -240,7 +240,7 @@ impl fmt::Display for EnumDecl {
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub struct Parameter {
+pub struct Parameter<Type> {
     pub loc: pt::Loc,
     /// The name can empty (e.g. in an event field or unnamed parameter/return)
     pub id: Option<pt::Identifier>,
@@ -266,7 +266,7 @@ pub struct ParameterAnnotation {
     pub id: pt::Identifier,
 }
 
-impl Parameter {
+impl Parameter<Type> {
     /// Create a new instance of the given `Type`, with all other values set to their default.
     pub fn new_default(ty: Type) -> Self {
         Self {
@@ -328,8 +328,8 @@ pub struct Function {
     pub signature: String,
     pub mutability: Mutability,
     pub visibility: pt::Visibility,
-    pub params: Arc<Vec<Parameter>>,
-    pub returns: Arc<Vec<Parameter>>,
+    pub params: Arc<Vec<Parameter<Type>>>,
+    pub returns: Arc<Vec<Parameter<Type>>>,
     /// Constructor arguments for base contracts, only present on constructors
     pub bases: BTreeMap<usize, (pt::Loc, usize, Vec<Expression>)>,
     /// Modifiers for functions
@@ -356,6 +356,8 @@ pub struct Function {
     /// This indexmap stores the accounts this functions needs to be called on Solana
     /// The string is the account's name
     pub solana_accounts: RefCell<IndexMap<String, SolanaAccount>>,
+    /// List of contracts this function creates
+    pub creates: Vec<(pt::Loc, usize)>,
 }
 
 /// This struct represents a Solana account. There is no name field, because
@@ -383,8 +385,8 @@ pub struct ConstructorAnnotations {
 /// for both yul and solidity functions
 pub trait FunctionAttributes {
     fn get_symbol_table(&self) -> &Symtable;
-    fn get_parameters(&self) -> &Vec<Parameter>;
-    fn get_returns(&self) -> &Vec<Parameter>;
+    fn get_parameters(&self) -> &Vec<Parameter<Type>>;
+    fn get_returns(&self) -> &Vec<Parameter<Type>>;
 }
 
 impl FunctionAttributes for Function {
@@ -392,11 +394,11 @@ impl FunctionAttributes for Function {
         &self.symtable
     }
 
-    fn get_parameters(&self) -> &Vec<Parameter> {
+    fn get_parameters(&self) -> &Vec<Parameter<Type>> {
         &self.params
     }
 
-    fn get_returns(&self) -> &Vec<Parameter> {
+    fn get_returns(&self) -> &Vec<Parameter<Type>> {
         &self.returns
     }
 }
@@ -411,8 +413,8 @@ impl Function {
         ty: pt::FunctionTy,
         mutability: Option<pt::Mutability>,
         visibility: pt::Visibility,
-        params: Vec<Parameter>,
-        returns: Vec<Parameter>,
+        params: Vec<Parameter<Type>>,
+        returns: Vec<Parameter<Type>>,
         ns: &Namespace,
     ) -> Self {
         let signature = match ty {
@@ -463,6 +465,7 @@ impl Function {
             annotations: ConstructorAnnotations::default(),
             mangled_name_contracts: HashSet::new(),
             solana_accounts: IndexMap::new().into(),
+            creates: Vec::new(),
         }
     }
 
@@ -742,11 +745,11 @@ pub enum VersionReq {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Version {
-    pub major: u64,
-    pub minor: Option<u64>,
-    pub patch: Option<u64>,
+    pub major: u32,
+    pub minor: Option<u32>,
+    pub patch: Option<u32>,
 }
 
 impl fmt::Display for Version {
@@ -887,12 +890,6 @@ pub enum Expression {
         loc: pt::Loc,
         ty: Type,
         value: Vec<u8>,
-    },
-    CodeLiteral {
-        loc: pt::Loc,
-        contract_no: usize,
-        // runtime code rather than deployer (evm only)
-        runtime: bool,
     },
     NumberLiteral {
         loc: pt::Loc,
@@ -1248,10 +1245,6 @@ pub enum Expression {
         kind: Builtin,
         args: Vec<Expression>,
     },
-    InterfaceId {
-        loc: pt::Loc,
-        contract_no: usize,
-    },
     List {
         loc: pt::Loc,
         list: Vec<Expression>,
@@ -1267,6 +1260,10 @@ pub enum Expression {
         loc: pt::Loc,
         ty: Type,
         event_no: usize,
+    },
+    TypeOperator {
+        loc: pt::Loc,
+        ty: Type,
     },
 }
 
@@ -1508,16 +1505,15 @@ impl Recurse for Expression {
                 }
 
                 Expression::NumberLiteral { .. }
-                | Expression::InterfaceId { .. }
                 | Expression::InternalFunction { .. }
                 | Expression::ConstantVariable { .. }
                 | Expression::StorageVariable { .. }
                 | Expression::Variable { .. }
                 | Expression::RationalNumberLiteral { .. }
-                | Expression::CodeLiteral { .. }
                 | Expression::BytesLiteral { .. }
                 | Expression::BoolLiteral { .. }
-                | Expression::EventSelector { .. } => (),
+                | Expression::EventSelector { .. }
+                | Expression::TypeOperator { .. } => (),
             }
         }
     }
@@ -1528,7 +1524,6 @@ impl CodeLocation for Expression {
         match self {
             Expression::BoolLiteral { loc, .. }
             | Expression::BytesLiteral { loc, .. }
-            | Expression::CodeLiteral { loc, .. }
             | Expression::NumberLiteral { loc, .. }
             | Expression::RationalNumberLiteral { loc, .. }
             | Expression::StructLiteral { loc, .. }
@@ -1587,11 +1582,11 @@ impl CodeLocation for Expression {
             | Expression::Assign { loc, .. }
             | Expression::List { loc, list: _ }
             | Expression::FormatString { loc, format: _ }
-            | Expression::InterfaceId { loc, .. }
             | Expression::And { loc, .. }
             | Expression::NamedMember { loc, .. }
             | Expression::UserDefinedOperator { loc, .. }
-            | Expression::EventSelector { loc, .. } => *loc,
+            | Expression::EventSelector { loc, .. }
+            | Expression::TypeOperator { loc, .. } => *loc,
         }
     }
 }
@@ -1777,6 +1772,12 @@ pub enum Builtin {
     ECRecover,
     StringConcat,
     BytesConcat,
+    TypeMin,
+    TypeMax,
+    TypeName,
+    TypeInterfaceId,
+    TypeRuntimeCode,
+    TypeCreatorCode,
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -1804,7 +1805,7 @@ pub enum Statement {
         unchecked: bool,
         statements: Vec<Statement>,
     },
-    VariableDecl(pt::Loc, usize, Parameter, Option<Arc<Expression>>),
+    VariableDecl(pt::Loc, usize, Parameter<Type>, Option<Arc<Expression>>),
     If(pt::Loc, bool, Expression, Vec<Statement>, Vec<Statement>),
     While(pt::Loc, bool, Expression, Vec<Statement>),
     For {
@@ -1841,7 +1842,7 @@ pub enum Statement {
 #[derive(Clone, Debug)]
 pub struct TryCatch {
     pub expr: Expression,
-    pub returns: Vec<(Option<usize>, Parameter)>,
+    pub returns: Vec<(Option<usize>, Parameter<Type>)>,
     pub ok_stmt: Vec<Statement>,
     pub errors: Vec<CatchClause>,
     pub catch_all: Option<CatchClause>,
@@ -1849,7 +1850,7 @@ pub struct TryCatch {
 
 #[derive(Clone, Debug)]
 pub struct CatchClause {
-    pub param: Option<Parameter>,
+    pub param: Option<Parameter<Type>>,
     pub param_pos: Option<usize>,
     pub stmt: Vec<Statement>,
 }
@@ -1859,7 +1860,7 @@ pub struct CatchClause {
 pub enum DestructureField {
     None,
     Expression(Expression),
-    VariableDecl(usize, Parameter),
+    VariableDecl(usize, Parameter<Type>),
 }
 
 impl OptionalCodeLocation for DestructureField {

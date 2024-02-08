@@ -12,6 +12,7 @@ pub mod standard_json;
 // In Sema, we use result unit for returning early
 // when code-misparses. The error will be added to the namespace diagnostics, no need to have anything but unit
 // as error.
+pub mod lir;
 pub mod sema;
 
 use file_resolver::FileResolver;
@@ -32,6 +33,7 @@ pub enum Target {
     },
     /// Ethereum EVM, see <https://ethereum.org/en/developers/docs/evm/>
     EVM,
+    Soroban,
 }
 
 impl fmt::Display for Target {
@@ -40,6 +42,7 @@ impl fmt::Display for Target {
             Target::Solana => write!(f, "Solana"),
             Target::Polkadot { .. } => write!(f, "Polkadot"),
             Target::EVM => write!(f, "EVM"),
+            Target::Soroban => write!(f, "Soroban"),
         }
     }
 }
@@ -52,6 +55,7 @@ impl PartialEq for Target {
             Target::Solana => matches!(other, Target::Solana),
             Target::Polkadot { .. } => matches!(other, Target::Polkadot { .. }),
             Target::EVM => matches!(other, Target::EVM),
+            Target::Soroban => matches!(other, Target::Soroban),
         }
     }
 }
@@ -146,7 +150,7 @@ pub fn compile(
         let contract = &ns.contracts[contract_no];
 
         if contract.instantiable {
-            let code = contract.emit(&ns, opts);
+            let code = contract.emit(&ns, opts, contract_no);
 
             let (abistr, _) = abi::generate_abi(contract_no, &ns, &code, false, &authors, version);
 

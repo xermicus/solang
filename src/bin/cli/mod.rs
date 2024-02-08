@@ -180,10 +180,6 @@ impl Compile {
                 }
 
                 // DebugFeatures args
-                "NOLOGAPIRETURNS" => {
-                    self.debug_features.log_api_return_codes =
-                        *matches.get_one::<bool>("NOLOGAPIRETURNS").unwrap()
-                }
                 "NOLOGRUNTIMEERRORS" => {
                     self.debug_features.log_runtime_errors =
                         *matches.get_one::<bool>("NOLOGRUNTIMEERRORS").unwrap()
@@ -277,7 +273,7 @@ pub struct TargetArg {
 
 #[derive(Args, Deserialize, Debug, PartialEq)]
 pub struct CompileTargetArg {
-    #[arg(name = "TARGET", long = "target", value_parser = ["solana", "polkadot", "polkadot-riscv", "evm"], help = "Target to build for [possible values: solana, polkadot]", num_args = 1, hide_possible_values = true)]
+    #[arg(name = "TARGET", long = "target", value_parser = ["solana", "polkadot", "polkadot-riscv", "evm", "soroban"], help = "Target to build for [possible values: solana, polkadot]", num_args = 1, hide_possible_values = true)]
     pub name: Option<String>,
 
     #[arg(name = "ADDRESS_LENGTH", help = "Address length on the Polkadot Parachain", long = "address-length", num_args = 1, value_parser = value_parser!(u64).range(4..1024))]
@@ -329,10 +325,6 @@ pub struct CompilePackage {
 
 #[derive(Args, Deserialize, Debug, PartialEq)]
 pub struct DebugFeatures {
-    #[arg(name = "NOLOGAPIRETURNS", help = "Disable logging the return codes of runtime API calls in the environment", long = "no-log-api-return-codes", action = ArgAction::SetFalse)]
-    #[serde(default, rename(deserialize = "log-api-return-codes"))]
-    pub log_api_return_codes: bool,
-
     #[arg(name = "NOLOGRUNTIMEERRORS", help = "Disable logging runtime errors in the environment", long = "no-log-runtime-errors", action = ArgAction::SetFalse)]
     #[serde(default, rename(deserialize = "log-runtime-errors"))]
     pub log_runtime_errors: bool,
@@ -353,7 +345,6 @@ pub struct DebugFeatures {
 impl Default for DebugFeatures {
     fn default() -> Self {
         DebugFeatures {
-            log_api_return_codes: true,
             log_runtime_errors: true,
             log_prints: true,
             generate_debug_info: false,
@@ -469,6 +460,7 @@ pub(crate) fn target_arg<T: TargetArgTrait>(target_arg: &T) -> Target {
             riscv: false,
         },
         "evm" => solang::Target::EVM,
+        "soroban" => solang::Target::Soroban,
         _ => unreachable!(),
     };
 
@@ -580,7 +572,6 @@ pub fn options_arg(debug: &DebugFeatures, optimizations: &Optimizations) -> Opti
         common_subexpression_elimination: optimizations.common_subexpression_elimination,
         generate_debug_information: debug.generate_debug_info,
         opt_level,
-        log_api_return_codes: debug.log_api_return_codes && !debug.release,
         log_runtime_errors: debug.log_runtime_errors && !debug.release,
         log_prints: debug.log_prints && !debug.release,
         #[cfg(feature = "wasm_opt")]

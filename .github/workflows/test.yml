@@ -49,7 +49,7 @@ jobs:
   linux-x86-64:
     name: Linux x86-64
     runs-on: solang-ubuntu-latest
-    container: ghcr.io/hyperledger/solang-llvm:ci-6
+    container: ghcr.io/hyperledger/solang-llvm:ci-7
     env:
       RUSTFLAGS: -C instrument-coverage -C llvm-args=--instrprof-atomic-counter-update-all --cfg=coverage --cfg=trybuild_no_target
       CARGO_INCREMENTAL: 0
@@ -73,9 +73,11 @@ jobs:
     - name: Run cargo clippy
       run: cargo clippy --workspace --tests --bins -- -D warnings
     - name: Run cargo clippy without wasm_opt feature
-      run: cargo clippy --workspace --no-default-features --features language_server,llvm --bins -- -D warnings
+      run: cargo clippy --workspace --no-default-features --features language_server,llvm,soroban --bins -- -D warnings
     - name: Run cargo clippy without llvm feature
       run: cargo clippy --workspace --no-default-features --lib -- -D warnings
+    - name: Run cargo clippy with only soroban feature
+      run: cargo clippy --workspace --no-default-features --features soroban,llvm --lib -- -D warnings
     - name: Run cargo doc
       run: cargo doc --workspace --bins
     - name: Run cargo fmt
@@ -87,7 +89,7 @@ jobs:
         cargo build
     - name: Run tests
       if: always()
-      run: cargo llvm-cov --all-features --workspace --no-report
+      run: cargo llvm-cov --all-features --workspace --no-report --jobs 2
     - name: Upload binary
       uses: actions/upload-artifact@v3.1.0
       with:
@@ -109,14 +111,13 @@ jobs:
     name: Linux Arm
     runs-on: linux-arm64
     if: ${{ github.repository_owner == 'hyperledger' }}
-    container: ghcr.io/hyperledger/solang-llvm:ci-6
+    container: ghcr.io/hyperledger/solang-llvm:ci-7
     steps:
     - name: Checkout sources
       uses: actions/checkout@v3
       with:
         submodules: recursive
-    - name: Rust stable
-      run: rustup default 1.72.0
+    - uses: dtolnay/rust-toolchain@1.72.0
     - name: Build
       run: cargo build --verbose
     - name: Run tests
@@ -135,11 +136,11 @@ jobs:
       with:
         submodules: recursive
     - name: Download LLVM
-      run: curl -sSL -o c:\llvm.zip https://github.com/hyperledger/solang-llvm/releases/download/llvm15-1/llvm15.0-win.zip
+      run: curl -sSL -o c:\llvm.zip https://github.com/hyperledger/solang-llvm/releases/download/llvm16-0/llvm16.0-win.zip
     - name: Extract LLVM
       run: unzip c:\llvm.zip -d c:/
     - name: Add LLVM to Path
-      run: echo "c:\llvm15.0\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8
+      run: echo "c:\llvm16.0\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8
     # Use C:\ as D:\ might run out of space
     - name: "Use C: for rust temporary files"
       run: echo "CARGO_TARGET_DIR=C:\target" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
@@ -171,17 +172,17 @@ jobs:
         submodules: recursive
     - uses: dtolnay/rust-toolchain@1.72.0
     - name: Get LLVM
-      run: curl -sSL --output llvm15.0-mac-arm.tar.xz https://github.com/hyperledger/solang-llvm/releases/download/llvm15-1/llvm15.0-mac-arm.tar.xz
+      run: curl -sSL --output llvm16.0-mac-arm.tar.xz https://github.com/hyperledger/solang-llvm/releases/download/llvm16-0/llvm16.0-mac-arm.tar.xz
     - name: Extract LLVM
-      run: tar Jxf llvm15.0-mac-arm.tar.xz
+      run: tar Jxf llvm16.0-mac-arm.tar.xz
     - name: Add LLVM to Path
-      run: echo "$(pwd)/llvm15.0/bin" >> $GITHUB_PATH
+      run: echo "$(pwd)/llvm16.0/bin" >> $GITHUB_PATH
     - name: Build
       run: cargo build --verbose
     - name: Run tests
       run: cargo test --verbose --workspace
     - name: Run tests without wasm_opt
-      run: cargo test --verbose --workspace --no-default-features --features language_server,llvm
+      run: cargo test --verbose --workspace --no-default-features --features language_server,llvm,soroban
     - uses: actions/upload-artifact@v3.1.0
       with:
         name: solang-mac-arm
@@ -197,11 +198,11 @@ jobs:
         submodules: recursive
     - uses: dtolnay/rust-toolchain@1.72.0
     - name: Get LLVM
-      run: wget -q -O llvm15.0-mac-intel.tar.xz https://github.com/hyperledger/solang-llvm/releases/download/llvm15-1/llvm15.0-mac-intel.tar.xz
+      run: wget -q -O llvm16.0-mac-intel.tar.xz https://github.com/hyperledger/solang-llvm/releases/download/llvm16-0/llvm16.0-mac-intel.tar.xz
     - name: Extract LLVM
-      run: tar Jxf llvm15.0-mac-intel.tar.xz
+      run: tar Jxf llvm16.0-mac-intel.tar.xz
     - name: Add LLVM to Path
-      run: echo "$(pwd)/llvm15.0/bin" >> $GITHUB_PATH
+      run: echo "$(pwd)/llvm16.0/bin" >> $GITHUB_PATH
     - name: Build
       run: cargo build --verbose
     - name: Run tests
@@ -230,10 +231,9 @@ jobs:
         name: solang-mac
         path: solang-mac
 
-  container-multiarch:
-    name: Multiarch Container Image
-    runs-on: linux-arm64
-    if: ${{ github.repository_owner == 'hyperledger' }}
+  container:
+    name: Container Image
+    runs-on: solang-ubuntu-latest
     steps:
     - name: Checkout sources
       uses: actions/checkout@v3
@@ -244,15 +244,13 @@ jobs:
         echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u $GITHUB_ACTOR --password-stdin
         docker buildx build . \
           ${{steps.push.outputs.push}} \
-          --provenance=false \
           --tag ghcr.io/${GITHUB_REPOSITORY}:latest \
-          --platform linux/arm64,linux/amd64 \
           --label org.opencontainers.image.description="Solidity Compiler for Solana and Polkadot version $(git describe --tags)"
 
   anchor:
     name: Anchor Integration test
     runs-on: solang-ubuntu-latest
-    container: ghcr.io/hyperledger/solang-llvm:ci-6
+    container: ghcr.io/hyperledger/solang-llvm:ci-7
     needs: linux-x86-64
     steps:
     - name: Checkout sources
@@ -260,8 +258,7 @@ jobs:
     - uses: actions/setup-node@v3
       with:
         node-version: '16'
-    - name: Rust Stable
-      run: rustup default stable
+    - uses: dtolnay/rust-toolchain@1.72.0
     - name: Setup yarn
       run: npm install -g yarn
     - uses: actions/download-artifact@v3
@@ -304,7 +301,7 @@ jobs:
   solana:
     name: Solana Integration test
     runs-on: solang-ubuntu-latest
-    container: ghcr.io/hyperledger/solang-llvm:ci-6
+    container: ghcr.io/hyperledger/solang-llvm:ci-7
     needs: linux-x86-64
     steps:
     - name: Checkout sources
@@ -312,8 +309,7 @@ jobs:
     - uses: actions/setup-node@v3
       with:
         node-version: '16'
-    - name: Rust Stable
-      run: rustup default stable
+    - uses: dtolnay/rust-toolchain@1.72.0
     - uses: actions/download-artifact@v3
       with:
         name: solang-linux-x86-64
@@ -352,11 +348,8 @@ jobs:
       # We can't run substrate node as a github actions service, since it requires
       # command line arguments. See https://github.com/actions/runner/pull/1152
     - name: Start substrate contracts node
-      run: echo id=$(docker run -d -p 9944:9944 ghcr.io/hyperledger/solang-substrate-ci:054bef6 substrate-contracts-node --dev --rpc-external) >> $GITHUB_OUTPUT
+      run: echo id=$(docker run -d -p 9944:9944 ghcr.io/hyperledger/solang-substrate-ci:ad6da01 substrate-contracts-node --dev --rpc-external -lwarn,runtime::contracts=trace) >> $GITHUB_OUTPUT
       id: substrate
-    - uses: actions/setup-node@v3
-      with:
-        node-version: '16'
     - uses: actions/download-artifact@v3
       with:
         name: solang-linux-x86-64
@@ -364,6 +357,9 @@ jobs:
     - run: |
         chmod 755 ./bin/solang
         echo "$(pwd)/bin" >> $GITHUB_PATH
+    - uses: actions/setup-node@v3
+      with:
+        node-version: '16'
     - run: npm install
       working-directory: ./integration/polkadot
     - name: Build ink! contracts
@@ -394,9 +390,9 @@ jobs:
       # We can't run substrate node as a github actions service, since it requires
       # command line arguments. See https://github.com/actions/runner/pull/1152
     - name: Start substrate
-      run: echo id=$(docker run -d -p 9944:9944 ghcr.io/hyperledger/solang-substrate-ci:054bef6 substrate-contracts-node --dev --rpc-external) >> $GITHUB_OUTPUT
+      run: echo id=$(docker run -d -p 9944:9944 ghcr.io/hyperledger/solang-substrate-ci:ad6da01 substrate-contracts-node --dev --rpc-external -lwarn,runtime::contracts=trace) >> $GITHUB_OUTPUT
       id: substrate
-    - uses: actions/download-artifact@master
+    - uses: actions/download-artifact@v3
       with:
         name: solang-linux-x86-64
         path: bin
@@ -475,7 +471,7 @@ jobs:
   coverage:
     runs-on: ubuntu-latest
     name: Coverage report
-    container: ghcr.io/hyperledger/solang-llvm:ci-6
+    container: ghcr.io/hyperledger/solang-llvm:ci-7
     needs: [linux-x86-64, solana, anchor, polkadot, polkadot-subxt, vscode]
     env:
       RUSTFLAGS: -C instrument-coverage -C llvm-args=--instrprof-atomic-counter-update-all --cfg=coverage --cfg=trybuild_no_target
@@ -495,32 +491,32 @@ jobs:
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Download Rust coverage files
-        uses: actions/download-artifact@master
+        uses: actions/download-artifact@v3
         with:
          name: rust-tests.tar.gz
          path: ./target
       - name: Download Solana coverage files
-        uses: actions/download-artifact@master
+        uses: actions/download-artifact@v3
         with:
           name: solana-tests
           path: ./target
       - name: Download Polkadot coverage files
-        uses: actions/download-artifact@master
+        uses: actions/download-artifact@v3
         with:
           name: polkadot-tests
           path: ./target
       - name: Download Polkadot subxt coverage files
-        uses: actions/download-artifact@master
+        uses: actions/download-artifact@v3
         with:
           name: polkadot-subxt-tests
           path: ./target
       - name: Download Anchor coverage files
-        uses: actions/download-artifact@master
+        uses: actions/download-artifact@v3
         with:
           name: anchor-tests
           path: ./target
       - name: Download VSCode coverage files
-        uses: actions/download-artifact@master
+        uses: actions/download-artifact@v3
         with:
           name: vscode-tests
           path: ./target

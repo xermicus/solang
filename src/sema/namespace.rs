@@ -42,6 +42,7 @@ impl Namespace {
                 ..
             } => (address_length, value_length),
             Target::Solana => (32, 8),
+            Target::Soroban => (32, 8),
         };
 
         let mut ns = Namespace {
@@ -71,6 +72,7 @@ impl Namespace {
         match target {
             Target::Solana => ns.add_solana_builtins(),
             Target::Polkadot { .. } => ns.add_polkadot_builtins(),
+            Target::Soroban => ns.add_soroban_builtins(),
             _ => {}
         }
 
@@ -1442,6 +1444,8 @@ impl Namespace {
         let mut dimensions = vec![];
 
         loop {
+            expr = expr.strip_parentheses();
+
             expr = match expr {
                 pt::Expression::ArraySubscript(_, r, None) => {
                     dimensions.push(None);
@@ -1564,7 +1568,7 @@ impl Namespace {
     /// Generate the signature for the given name and parameters; can be used for events and functions.
     ///
     /// Recursive arguments are invalid and default to a signature of `#recursive` to avoid stack overflows.
-    pub fn signature(&self, name: &str, params: &[Parameter]) -> String {
+    pub fn signature(&self, name: &str, params: &[Parameter<Type>]) -> String {
         format!(
             "{}({})",
             name,

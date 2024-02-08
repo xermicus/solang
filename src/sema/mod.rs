@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use self::{
-    expression::strings::unescape,
+    expression::{constructor::check_circular_reference, strings::unescape},
     functions::{resolve_params, resolve_returns},
     symtable::Symtable,
     unused_variable::check_unused_errors,
+    unused_variable::{check_unused_events, check_unused_namespace_variables},
     variables::variable_decl,
 };
 use crate::file_resolver::{FileResolver, ResolvedFile};
-use crate::sema::unused_variable::{check_unused_events, check_unused_namespace_variables};
 use num_bigint::BigInt;
 use solang_parser::{
     doccomment::{parse_doccomments, DocComment},
@@ -26,12 +26,14 @@ pub mod diagnostics;
 mod dotgraphviz;
 pub(crate) mod eval;
 pub(crate) mod expression;
+mod external_functions;
 pub mod file;
 mod format;
 mod function_annotation;
 mod functions;
 mod mutability;
 mod namespace;
+mod pragma;
 pub(crate) mod solana_accounts;
 mod statements;
 pub mod symtable;
@@ -121,7 +123,7 @@ fn sema_file(file: &ResolvedFile, resolver: &mut FileResolver, ns: &mut ast::Nam
         match &item.part {
             pt::SourceUnitPart::PragmaDirective(pragma) => {
                 annotions_not_allowed(&item.annotations, "pragma", ns);
-                resolve_pragma(pragma, ns);
+                pragma::resolve_pragma(pragma, ns);
             }
             pt::SourceUnitPart::ImportDirective(import) => {
                 annotions_not_allowed(&item.annotations, "import", ns);
@@ -183,6 +185,13 @@ fn sema_file(file: &ResolvedFile, resolver: &mut FileResolver, ns: &mut ast::Nam
     // now we can resolve the body of functions outside of contracts
     for (func_no, func) in resolve_bodies {
         let _ = statements::resolve_function_body(func, &[], file_no, None, func_no, ns);
+    }
+
+    if !ns.diagnostics.any_errors() {
+        for contract_no in 0..ns.contracts.len() {
+            external_functions::add_external_functions(contract_no, ns);
+            check_circular_reference(contract_no, ns);
+        }
     }
 
     // check for stray semi colons
@@ -414,139 +423,6 @@ fn resolve_import(
             );
         }
     }
-}
-
-/// Resolve pragma. We don't do anything with pragmas for now
-fn resolve_pragma(pragma: &pt::PragmaDirective, ns: &mut ast::Namespace) {
-    match pragma {
-        pt::PragmaDirective::Identifier(loc, Some(ident), Some(value)) => {
-            plain_pragma(loc, &ident.name, &value.name, ns);
-
-            ns.pragmas.push(ast::Pragma::Identifier {
-                loc: *loc,
-                name: ident.clone(),
-                value: value.clone(),
-            });
-        }
-        pt::PragmaDirective::StringLiteral(loc, ident, value) => {
-            plain_pragma(loc, &ident.name, &value.string, ns);
-
-            ns.pragmas.push(ast::Pragma::StringLiteral {
-                loc: *loc,
-                name: ident.clone(),
-                value: value.clone(),
-            });
-        }
-        pt::PragmaDirective::Version(loc, ident, versions) => {
-            if ident.name != "solidity" {
-                ns.diagnostics.push(ast::Diagnostic::error(
-                    ident.loc,
-                    format!("unknown pragma '{}'", ident.name),
-                ));
-            } else {
-                // parser versions
-                let mut res = Vec::new();
-
-                for version in versions {
-                    let Ok(v) = parse_version_comparator(version, ns) else {
-                        return;
-                    };
-                    res.push(v);
-                }
-
-                ns.pragmas.push(ast::Pragma::SolidityVersion {
-                    loc: *loc,
-                    versions: res,
-                });
-            }
-        }
-        pt::PragmaDirective::Identifier { .. } => (),
-    }
-}
-
-fn plain_pragma(loc: &pt::Loc, name: &str, value: &str, ns: &mut ast::Namespace) {
-    if name == "experimental" && value == "ABIEncoderV2" {
-        ns.diagnostics.push(ast::Diagnostic::debug(
-            *loc,
-            "pragma 'experimental' with value 'ABIEncoderV2' is ignored".to_string(),
-        ));
-    } else if name == "experimental" && value == "solidity" {
-        ns.diagnostics.push(ast::Diagnostic::error(
-            *loc,
-            "experimental solidity features are not supported".to_string(),
-        ));
-    } else if name == "abicoder" && value == "v2" {
-        ns.diagnostics.push(ast::Diagnostic::debug(
-            *loc,
-            "pragma 'abicoder' with value 'v2' is ignored".to_string(),
-        ));
-    } else {
-        ns.diagnostics.push(ast::Diagnostic::warning(
-            *loc,
-            format!("unknown pragma '{}' with value '{}' ignored", name, value),
-        ));
-    }
-}
-
-fn parse_version_comparator(
-    version: &pt::VersionComparator,
-    ns: &mut ast::Namespace,
-) -> Result<ast::VersionReq, ()> {
-    match version {
-        pt::VersionComparator::Plain { loc, version } => Ok(ast::VersionReq::Plain {
-            loc: *loc,
-            version: parse_version(loc, version, ns)?,
-        }),
-        pt::VersionComparator::Operator { loc, op, version } => Ok(ast::VersionReq::Operator {
-            loc: *loc,
-            op: *op,
-            version: parse_version(loc, version, ns)?,
-        }),
-        pt::VersionComparator::Range { loc, from, to } => Ok(ast::VersionReq::Range {
-            loc: *loc,
-            from: parse_version(loc, from, ns)?,
-            to: parse_version(loc, to, ns)?,
-        }),
-        pt::VersionComparator::Or { loc, left, right } => Ok(ast::VersionReq::Or {
-            loc: *loc,
-            left: parse_version_comparator(left, ns)?.into(),
-            right: parse_version_comparator(right, ns)?.into(),
-        }),
-    }
-}
-
-fn parse_version(
-    loc: &pt::Loc,
-    version: &[String],
-    ns: &mut ast::Namespace,
-) -> Result<ast::Version, ()> {
-    let mut res = Vec::new();
-
-    for v in version {
-        if let Ok(v) = v.parse() {
-            res.push(v);
-        } else {
-            ns.diagnostics.push(ast::Diagnostic::error(
-                *loc,
-                format!("'{v}' is not a valid number"),
-            ));
-            return Err(());
-        }
-    }
-
-    if version.len() > 3 {
-        ns.diagnostics.push(ast::Diagnostic::error(
-            *loc,
-            "no more than three numbers allowed - major.minor.patch".into(),
-        ));
-        return Err(());
-    }
-
-    Ok(ast::Version {
-        major: res[0],
-        minor: res.get(1).cloned(),
-        patch: res.get(2).cloned(),
-    })
 }
 
 /// Walk through the parse tree and collect all the annotations and doccomments for

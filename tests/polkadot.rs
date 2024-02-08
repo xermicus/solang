@@ -357,6 +357,8 @@ fn read_hash(mem: &[u8], ptr: u32) -> Hash {
 /// Host functions mock the original implementation, refer to the [pallet docs][1] for more information.
 ///
 /// [1]: https://docs.rs/pallet-contracts/latest/pallet_contracts/api_doc/index.html
+///
+/// Address `[0; u8]` is considered the root account.
 #[wasm_host]
 impl Runtime {
     #[seal(0)]
@@ -788,6 +790,11 @@ impl Runtime {
     }
 
     #[seal(0)]
+    fn caller_is_root() -> Result<u32, Trap> {
+        Ok((vm.accounts[vm.caller_account].address == [0; 32]).into())
+    }
+
+    #[seal(0)]
     fn set_code_hash(code_hash_ptr: u32) -> Result<u32, Trap> {
         let hash = read_hash(mem, code_hash_ptr);
         if let Some(code) = vm.blobs.iter().find(|code| code.hash == hash) {
@@ -816,6 +823,11 @@ impl MockSubstrate {
         self.0.data_mut().transferred_value = 0;
 
         Ok(())
+    }
+
+    /// Overwrites the address at asssociated `account` index with the given `address`.
+    pub fn set_account_address(&mut self, account: usize, address: [u8; 32]) {
+        self.0.data_mut().accounts[account].address = address;
     }
 
     /// Specify the caller account index for the next function or constructor call.
@@ -1024,14 +1036,14 @@ impl MockSubstrate {
 /// The mock runtime will contain a contract account for each contract in `src`.
 /// Constructors are _not_ called, therefore the storage will not be initialized.
 pub fn build_solidity(src: &str) -> MockSubstrate {
-    build_solidity_with_options(src, false, true)
+    build_solidity_with_options(src, true)
 }
 
 /// A variant of `MockSubstrate::uild_solidity()` with the ability to specify compiler options:
 /// * log_ret: enable logging of host function return codes
 /// * log_err: enable logging of runtime errors
-pub fn build_solidity_with_options(src: &str, log_ret: bool, log_err: bool) -> MockSubstrate {
-    let blobs = build_wasm(src, log_ret, log_err)
+pub fn build_solidity_with_options(src: &str, log_err: bool) -> MockSubstrate {
+    let blobs = build_wasm(src, log_err)
         .iter()
         .map(|(code, abi)| WasmCode::new(abi, code))
         .collect();
@@ -1039,7 +1051,7 @@ pub fn build_solidity_with_options(src: &str, log_ret: bool, log_err: bool) -> M
     MockSubstrate(Store::new(&Engine::default(), Runtime::new(blobs)))
 }
 
-pub fn build_wasm(src: &str, log_ret: bool, log_err: bool) -> Vec<(Vec<u8>, String)> {
+pub fn build_wasm(src: &str, log_err: bool) -> Vec<(Vec<u8>, String)> {
     let tmp_file = OsStr::new("test.sol");
     let mut cache = FileResolver::default();
     cache.set_file_contents(tmp_file.to_str().unwrap(), src.to_string());
@@ -1051,7 +1063,6 @@ pub fn build_wasm(src: &str, log_ret: bool, log_err: bool) -> Vec<(Vec<u8>, Stri
         target,
         &Options {
             opt_level: opt.into(),
-            log_api_return_codes: log_ret,
             log_runtime_errors: log_err,
             log_prints: true,
             #[cfg(feature = "wasm_opt")]

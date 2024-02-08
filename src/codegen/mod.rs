@@ -9,7 +9,6 @@ pub(crate) mod dispatch;
 pub(crate) mod encoding;
 mod events;
 mod expression;
-mod external_functions;
 pub(super) mod polkadot;
 mod reaching_definitions;
 pub mod revert;
@@ -104,7 +103,6 @@ pub struct Options {
     pub common_subexpression_elimination: bool,
     pub generate_debug_information: bool,
     pub opt_level: OptimizationLevel,
-    pub log_api_return_codes: bool,
     pub log_runtime_errors: bool,
     pub log_prints: bool,
     #[cfg(feature = "wasm_opt")]
@@ -121,7 +119,6 @@ impl Default for Options {
             common_subexpression_elimination: true,
             generate_debug_information: false,
             opt_level: OptimizationLevel::Default,
-            log_api_return_codes: false,
             log_runtime_errors: false,
             log_prints: true,
             #[cfg(feature = "wasm_opt")]
@@ -195,8 +192,6 @@ fn contract(contract_no: usize, ns: &mut Namespace, opt: &Options) {
 
         let mut cfg_no = 0;
         let mut all_cfg = Vec::new();
-
-        external_functions::add_external_functions(contract_no, ns);
 
         // all the functions should have a cfg_no assigned, so we can generate call instructions to the correct function
         for (_, func_cfg) in ns.contracts[contract_no].all_functions.iter_mut() {
@@ -1674,7 +1669,7 @@ impl Expression {
 
     fn external_function_selector(&self) -> Expression {
         debug_assert!(
-            matches!(self.ty(), Type::ExternalFunction { .. }),
+            matches!(self.ty().deref_any(), Type::ExternalFunction { .. }),
             "This is not an external function"
         );
         let loc = self.loc();

@@ -72,6 +72,8 @@ pub struct ExprContext {
     pub loops: LoopScopes,
     /// Stack of currently active variable scopes
     pub active_scopes: Vec<VarScope>,
+    /// Solidity v0.5 and earlier don't complain about emit resolving to multiple events
+    pub ambiguous_emit: bool,
 }
 
 impl ExprContext {
@@ -432,7 +434,8 @@ impl Expression {
                         }
                     }
 
-                    diagnostics.push(Diagnostic::cast_error(
+                    // solc does not detect this problem, just warn about it
+                    diagnostics.push(Diagnostic::warning(
                         *loc,
                         format!(
                             "enum {} has no value with ordinal {}",
@@ -440,7 +443,6 @@ impl Expression {
                             big_number
                         ),
                     ));
-                    return Err(());
                 }
 
                 let to_width = enum_ty.ty.bits(ns);
@@ -841,17 +843,7 @@ impl Expression {
             }
             // Lengthing or shorting a fixed bytes array
             (Type::Bytes(from_len), Type::Bytes(to_len)) => {
-                if implicit {
-                    diagnostics.push(Diagnostic::cast_error(
-                        *loc,
-                        format!(
-                            "implicit conversion would truncate from {} to {}",
-                            from.to_string(ns),
-                            to.to_string(ns)
-                        ),
-                    ));
-                    Err(())
-                } else if to_len > from_len {
+                if to_len > from_len {
                     let shift = (to_len - from_len) * 8;
 
                     Ok(Expression::ShiftLeft {
@@ -868,6 +860,16 @@ impl Expression {
                             value: BigInt::from_u8(shift).unwrap(),
                         }),
                     })
+                } else if implicit {
+                    diagnostics.push(Diagnostic::cast_error(
+                        *loc,
+                        format!(
+                            "implicit conversion would truncate from {} to {}",
+                            from.to_string(ns),
+                            to.to_string(ns)
+                        ),
+                    ));
+                    Err(())
                 } else {
                     let shift = (from_len - to_len) * 8;
 
