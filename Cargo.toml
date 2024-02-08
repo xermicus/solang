@@ -73,9 +73,9 @@ forge-fmt = { version = "0.2.0", optional = true }
 # We don't use ethers-core directly, but need the correct version for the
 # build to work.
 ethers-core = { version = "2.0.10", optional = true }
-polkavm-common = { git = "https://github.com/koute/polkavm.git", rev = "3552524a248a025de8e608394fcf9eb7c528eb11" }
-polkavm-linker = { git = "https://github.com/koute/polkavm.git", rev = "3552524a248a025de8e608394fcf9eb7c528eb11" }
 soroban-sdk = { version = "20.0.0-rc2", features = ["testutils"], optional = true }
+polkavm-common = "0.8"
+polkavm-linker = "0.8"
 
 [dev-dependencies]
 num-derive = "0.4"

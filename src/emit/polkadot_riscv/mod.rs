@@ -113,6 +113,7 @@ impl PolkadotTarget {
             "transfer",
             "is_contract",
             "set_code_hash",
+            "caller_is_root",
         ]);
 
         binary
@@ -197,16 +198,12 @@ impl PolkadotTarget {
         bin: &mut Binary,
         ns: &Namespace,
     ) {
-        let ty = bin.context.void_type().fn_type(&[], false);
         let export_name = if storage_initializer.is_some() {
             "deploy"
         } else {
             "call"
         };
-        let func = bin
-            .module
-            .add_function(export_name, ty, Some(Linkage::External));
-        func.set_section(Some(".text.polkavm_export"));
+        let func = bin.module.get_function(export_name).unwrap();
         let (input, input_length) = self.public_function_prelude(bin, func, storage_initializer);
         let args = vec![
             BasicMetadataValueEnum::PointerValue(input),
